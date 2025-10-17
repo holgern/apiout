@@ -66,6 +66,19 @@ def apply_field_mapping(obj: Any, field_config: Dict[str, Any]) -> Any:
                                 result[key] = items
                         else:
                             result[key] = serialize_value(nested_obj)
+                elif "iterate" in value:
+                    items = []
+                    count_method = value["iterate"].get("count")
+                    item_method = value["iterate"].get("item")
+                    item_fields = value["iterate"].get("fields", {})
+
+                    if count_method and item_method:
+                        count = call_method_or_attr(obj, count_method)
+                        for i in range(count):
+                            item_obj = getattr(obj, item_method)(i)
+                            item_data = apply_field_mapping(item_obj, item_fields)
+                            items.append(item_data)
+                        result[key] = items
                 elif "fields" in value:
                     result[key] = apply_field_mapping(obj, value["fields"])
         return result

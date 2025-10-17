@@ -43,7 +43,7 @@ serializer = "openmeteo"
 [apis.params]
 latitude = 52.52
 longitude = 13.41
-hourly = ["temperature_2m", "precipitation", "wind_speed_10m"]
+# hourly = ["temperature_2m", "precipitation", "wind_speed_10m"]
 current = ["temperature_2m", "relative_humidity_2m"]
 
 [[apis]]
@@ -57,5 +57,5 @@ serializer = "openmeteo"
 [apis.params]
 latitude = 48.1351
 longitude = 11.5820
-hourly = ["temperature_2m", "precipitation"]
+# hourly = ["temperature_2m", "precipitation"]
 current = ["temperature_2m"]
