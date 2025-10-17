@@ -1,6 +1,6 @@
 import importlib
 import inspect
-from typing import Any, Dict, List, Set
+from typing import Any, Optional
 
 
 def is_simple_type(obj: Any) -> bool:
@@ -11,7 +11,7 @@ def is_collection(obj: Any) -> bool:
     return isinstance(obj, (list, tuple))
 
 
-def get_methods_and_attrs(obj: Any) -> tuple[List[str], List[str]]:
+def get_methods_and_attrs(obj: Any) -> tuple[list[str], list[str]]:
     methods = []
     attrs = []
 
@@ -31,8 +31,11 @@ def get_methods_and_attrs(obj: Any) -> tuple[List[str], List[str]]:
 
 
 def analyze_object(
-    obj: Any, max_depth: int = 3, current_depth: int = 0, visited: Set[int] = None
-) -> Dict[str, Any]:
+    obj: Any,
+    max_depth: int = 3,
+    current_depth: int = 0,
+    visited: Optional[set[int]] = None,
+) -> dict[str, Any]:
     if visited is None:
         visited = set()
 
@@ -70,21 +73,24 @@ def analyze_object(
 
             if not params or (len(params) == 1 and params[0] == "self"):
                 method_result = method()
-                result["methods"][method_name] = analyze_object(
+                result["methods"][method_name] = analyze_object(  # type: ignore[index]
                     method_result, max_depth, current_depth + 1, visited
                 )
             elif len(params) == 1 or (len(params) == 2 and params[0] == "self"):
-                result["methods"][method_name] = {
+                result["methods"][method_name] = {  # type: ignore[index]
                     "type": "indexed_method",
                     "note": "Takes index parameter, likely for iteration",
                 }
         except Exception as e:
-            result["methods"][method_name] = {"type": "error", "error": str(e)}
+            result["methods"][method_name] = {  # type: ignore[index]
+                "type": "error",
+                "error": str(e),
+            }
 
     for attr_name in attrs:
         try:
             attr = getattr(obj, attr_name)
-            result["attributes"][attr_name] = analyze_object(
+            result["attributes"][attr_name] = analyze_object(  # type: ignore[index]
                 attr, max_depth, current_depth + 1, visited
             )
         except Exception:
@@ -93,9 +99,9 @@ def analyze_object(
     return result
 
 
-def generate_serializer_config(
-    analysis: Dict[str, Any], prefix: str = ""
-) -> Dict[str, Any]:
+def generate_serializer_config(  # noqa: C901
+    analysis: dict[str, Any], prefix: str = ""
+) -> dict[str, Any]:
     if analysis.get("type") == "simple":
         return {}
 
@@ -115,7 +121,7 @@ def generate_serializer_config(
             continue
 
         elif method_info.get("type") == "object":
-            nested_class = method_info.get("class", "")
+            method_info.get("class", "")
 
             if "Length" in method_name or "Count" in method_name:
                 continue
@@ -125,8 +131,7 @@ def generate_serializer_config(
                 .replace("Hourly", "")
                 .replace("Daily", "")
             )
-            possible_count = f"{item_method_name}Length"
-            possible_item = (
+            (
                 f"{item_method_name}s"
                 if not item_method_name.endswith("s")
                 else item_method_name
@@ -185,7 +190,7 @@ def generate_serializer_config(
     return fields
 
 
-def generate_toml_serializer(name: str, fields: Dict[str, Any], indent: int = 0) -> str:
+def generate_toml_serializer(name: str, fields: dict[str, Any], indent: int = 0) -> str:
     lines = []
     indent_str = "  " * indent
 
@@ -211,7 +216,8 @@ def generate_toml_serializer(name: str, fields: Dict[str, Any], indent: int = 0)
                     )
                     lines.append(
                         f"[{name}.{key}.fields.variables]\n"
-                        f'iterate = {{ count = "{iterate["count"]}", item = "{iterate["item"]}", fields = {{ {fields_str} }} }}'
+                        f'iterate = {{ count = "{iterate["count"]}", '
+                        f'item = "{iterate["item"]}", fields = {{ {fields_str} }} }}'
                     )
 
     return "\n".join(lines)
@@ -222,7 +228,7 @@ def introspect_and_generate(
     client_class: str,
     method_name: str,
     url: str,
-    params: Dict[str, Any],
+    params: dict[str, Any],
     serializer_name: str = "generated",
 ) -> str:
     try:
@@ -249,8 +255,12 @@ def introspect_and_generate(
         for key, value in simple_fields.items():
             toml_output += f'{key} = "{value}"\n'
 
-        complex_fields = {k: v for k, v in fields.items() if isinstance(v, dict)}
+        complex_fields: dict[str, Any] = {
+            k: v for k, v in fields.items() if isinstance(v, dict)
+        }
         for key, value in complex_fields.items():
+            if not isinstance(value, dict):
+                continue
             toml_output += f"\n[serializers.{serializer_name}.fields.{key}]\n"
             toml_output += f'method = "{value["method"]}"\n'
 
@@ -267,8 +277,15 @@ def introspect_and_generate(
                                 for k, v in iterate.get("fields", {}).items()
                             ]
                         )
-                        toml_output += f"[serializers.{serializer_name}.fields.{key}.fields.variables]\n"
-                        toml_output += f'iterate = {{ count = "{iterate["count"]}", item = "{iterate["item"]}", fields = {{ {fields_str} }} }}\n'
+                        toml_output += (
+                            f"[serializers.{serializer_name}.fields.{key}."
+                            f"fields.variables]\n"
+                        )
+                        toml_output += (
+                            f'iterate = {{ count = "{iterate["count"]}", '
+                            f'item = "{iterate["item"]}", '
+                            f"fields = {{ {fields_str} }} }}\n"
+                        )
 
             if "iterate" in value:
                 iterate = value["iterate"]
@@ -278,7 +295,11 @@ def introspect_and_generate(
                 toml_output += (
                     f"[serializers.{serializer_name}.fields.{key}.fields.variables]\n"
                 )
-                toml_output += f'iterate = {{ count = "{iterate["count"]}", item = "{iterate["item"]}", fields = {{ {fields_str} }} }}\n'
+                toml_output += (
+                    f'iterate = {{ count = "{iterate["count"]}", '
+                    f'item = "{iterate["item"]}", '
+                    f"fields = {{ {fields_str} }} }}\n"
+                )
 
         return toml_output
 

@@ -32,7 +32,7 @@ def generate_cmd(
         params_dict = json.loads(params)
     except json.JSONDecodeError as e:
         err_console.print(f"[red]Error: Invalid JSON params: {e}[/red]")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
 
     result = introspect_and_generate(
         module, client_class, method, url, params_dict, name
@@ -60,7 +60,7 @@ def main(
             config_data = tomllib.load(f)
     except Exception as e:
         err_console.print(f"[red]Error reading config file: {e}[/red]")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
 
     if "apis" not in config_data or not config_data["apis"]:
         err_console.print("[red]Error: No 'apis' section found in config file[/red]")

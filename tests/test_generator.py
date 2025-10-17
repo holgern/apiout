@@ -1,9 +1,8 @@
-import pytest
 from apiout.generator import (
     analyze_object,
     generate_serializer_config,
-    is_simple_type,
     get_methods_and_attrs,
+    is_simple_type,
 )
 
 

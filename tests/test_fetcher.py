@@ -1,5 +1,5 @@
-import pytest
 from unittest.mock import Mock, patch
+
 from apiout.fetcher import fetch_api_data, resolve_serializer
 
 

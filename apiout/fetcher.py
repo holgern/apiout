@@ -1,22 +1,24 @@
 import importlib
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 from .serializer import serialize_response
 
 
 def resolve_serializer(
-    api_config: Dict[str, Any], global_serializers: Optional[Dict[str, Any]] = None
-) -> Dict[str, Any]:
-    serializer_config = api_config.get("serializer", {})
+    api_config: dict[str, Any], global_serializers: Optional[dict[str, Any]] = None
+) -> dict[str, Any]:
+    serializer_config: Any = api_config.get("serializer", {})
 
     if isinstance(serializer_config, str) and global_serializers:
         return global_serializers.get(serializer_config, {})
 
-    return serializer_config
+    if isinstance(serializer_config, dict):
+        return serializer_config
+    return {}
 
 
 def fetch_api_data(
-    api_config: Dict[str, Any], global_serializers: Optional[Dict[str, Any]] = None
+    api_config: dict[str, Any], global_serializers: Optional[dict[str, Any]] = None
 ) -> Any:
     try:
         module_name = api_config.get("module")

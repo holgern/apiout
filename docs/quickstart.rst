@@ -1,0 +1,168 @@
+Quickstart Guide
+================
+
+This guide will help you get started with **apiout** in minutes.
+
+Installation
+------------
+
+Install apiout using pip:
+
+.. code-block:: bash
+
+   pip install apiout
+
+Basic Usage
+-----------
+
+1. Without Serializers (Auto-serialize)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Create a file ``apis.toml``:
+
+.. code-block:: toml
+
+   [[apis]]
+   name = "berlin_weather"
+   module = "openmeteo_requests"
+   client_class = "Client"
+   method = "weather_api"
+   url = "https://api.open-meteo.com/v1/forecast"
+
+   [apis.params]
+   latitude = 52.52
+   longitude = 13.41
+   current = ["temperature_2m"]
+
+Run the fetcher:
+
+.. code-block:: bash
+
+   apiout run -c apis.toml --json
+
+The tool will automatically convert response objects to dictionaries.
+
+2. With Inline Serializers
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Add serializer configuration to the same file:
+
+.. code-block:: toml
+
+   [serializers.openmeteo]
+   [serializers.openmeteo.fields]
+   latitude = "Latitude"
+   longitude = "Longitude"
+
+   [serializers.openmeteo.fields.current]
+   method = "Current"
+   [serializers.openmeteo.fields.current.fields]
+   time = "Time"
+
+   [[apis]]
+   name = "berlin_weather"
+   module = "openmeteo_requests"
+   client_class = "Client"
+   method = "weather_api"
+   url = "https://api.open-meteo.com/v1/forecast"
+   serializer = "openmeteo"
+
+   [apis.params]
+   latitude = 52.52
+   longitude = 13.41
+   current = ["temperature_2m"]
+
+Run the same command:
+
+.. code-block:: bash
+
+   apiout run -c apis.toml --json
+
+3. With Separate Serializer File
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Create ``apis.toml``:
+
+.. code-block:: toml
+
+   [[apis]]
+   name = "berlin_weather"
+   module = "openmeteo_requests"
+   client_class = "Client"
+   method = "weather_api"
+   url = "https://api.open-meteo.com/v1/forecast"
+   serializer = "openmeteo"
+
+   [apis.params]
+   latitude = 52.52
+   longitude = 13.41
+   current = ["temperature_2m"]
+
+Create ``serializers.toml``:
+
+.. code-block:: toml
+
+   [serializers.openmeteo]
+   [serializers.openmeteo.fields]
+   latitude = "Latitude"
+   longitude = "Longitude"
+
+   [serializers.openmeteo.fields.current]
+   method = "Current"
+   [serializers.openmeteo.fields.current.fields]
+   time = "Time"
+
+Run with both files:
+
+.. code-block:: bash
+
+   apiout run -c apis.toml -s serializers.toml --json
+
+CLI Commands
+------------
+
+run
+~~~
+
+Fetch API data with configuration:
+
+.. code-block:: bash
+
+   apiout run -c <config.toml> [-s <serializers.toml>] [--json]
+
+**Options:**
+
+* ``-c, --config``: Path to API configuration file (required)
+* ``-s, --serializers``: Path to serializers configuration file (optional)
+* ``--json``: Output as JSON format (default: pretty-printed)
+
+generate
+~~~~~~~~
+
+Generate serializer configuration by introspecting an API:
+
+.. code-block:: bash
+
+   apiout generate \
+     --module openmeteo_requests \
+     --client-class Client \
+     --method weather_api \
+     --url "https://api.open-meteo.com/v1/forecast" \
+     --params '{"latitude": 52.52, "longitude": 13.41, "current": ["temperature_2m"]}' \
+     --name openmeteo
+
+**Options:**
+
+* ``-m, --module``: Python module name (required)
+* ``-c, --client-class``: Client class name (default: "Client")
+* ``--method``: Method name to call (required)
+* ``-u, --url``: API URL (required)
+* ``-p, --params``: JSON params dict (default: "{}")
+* ``-n, --name``: Serializer name (default: "generated")
+
+Next Steps
+----------
+
+* Read the :doc:`user_guide` for detailed information on configuration options
+* Check out :doc:`examples` for more complex use cases
+* Explore the :doc:`api_reference` for programmatic usage

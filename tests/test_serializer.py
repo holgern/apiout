@@ -1,9 +1,8 @@
-import pytest
 from apiout.serializer import (
-    serialize_value,
-    call_method_or_attr,
     apply_field_mapping,
+    call_method_or_attr,
     serialize_response,
+    serialize_value,
 )
 
 

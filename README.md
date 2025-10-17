@@ -1,14 +1,20 @@
 # apiout
 
-A flexible Python tool for fetching data from APIs and serializing responses using TOML configuration files.
+A flexible Python tool for fetching data from APIs and serializing responses using TOML
+configuration files.
 
 ## Features
 
-- **Config-driven API calls**: Define API endpoints, parameters, and authentication in TOML files
-- **Flexible serialization**: Map API responses to desired output formats using configurable field mappings
-- **Separate concerns**: Keep API configurations and serializers in separate files for better organization
-- **Default serialization**: Works without serializers - automatically converts objects to dictionaries
-- **Generator tool**: Introspect API responses and auto-generate serializer configurations
+- **Config-driven API calls**: Define API endpoints, parameters, and authentication in
+  TOML files
+- **Flexible serialization**: Map API responses to desired output formats using
+  configurable field mappings
+- **Separate concerns**: Keep API configurations and serializers in separate files for
+  better organization
+- **Default serialization**: Works without serializers - automatically converts objects
+  to dictionaries
+- **Generator tool**: Introspect API responses and auto-generate serializer
+  configurations
 
 ## Installation
 
@@ -42,7 +48,8 @@ Run the API fetcher:
 apiout run -c apis.toml --json
 ```
 
-Without serializers, the tool will automatically convert the response objects to dictionaries.
+Without serializers, the tool will automatically convert the response objects to
+dictionaries.
 
 ### 2. Using Serializers
 
@@ -118,6 +125,7 @@ apiout run -c <config.toml> [-s <serializers.toml>] [--json]
 ```
 
 **Options:**
+
 - `-c, --config`: Path to API configuration file (required)
 - `-s, --serializers`: Path to serializers configuration file (optional)
 - `--json`: Output as JSON format (default: pretty-printed)
@@ -137,6 +145,7 @@ apiout generate \
 ```
 
 **Options:**
+
 - `-m, --module`: Python module name (required)
 - `-c, --client-class`: Client class name (default: "Client")
 - `--method`: Method name to call (required)
@@ -174,10 +183,10 @@ method = "MethodName"            # Call a method on the object
 nested_field = "NestedAttribute"
 
 [serializers.name.fields.collection]
-iterate = { 
-  count = "CountMethod", 
-  item = "ItemMethod", 
-  fields = { value = "Value" } 
+iterate = {
+  count = "CountMethod",
+  item = "ItemMethod",
+  fields = { value = "Value" }
 }
 ```
 
@@ -202,13 +211,13 @@ Iterate over collections:
 [serializers.example.fields.items]
 method = "GetContainer"
 [serializers.example.fields.items.fields.variables]
-iterate = { 
+iterate = {
   count = "Length",        # Method that returns count
   item = "GetItem",        # Method that takes index and returns item
-  fields = { 
+  fields = {
     name = "Name",         # Fields to extract from each item
-    value = "Value" 
-  } 
+    value = "Value"
+  }
 }
 ```
 
@@ -223,7 +232,9 @@ values = "ValuesAsNumpy"  # Returns numpy array, auto-converted to list
 
 ## Examples
 
-See the included `myapi.toml` for a complete example with the OpenMeteo API, or check the separate `apis.toml` and `serializers.toml` files for the split configuration approach.
+See the included `myapi.toml` for a complete example with the OpenMeteo API, or check
+the separate `apis.toml` and `serializers.toml` files for the split configuration
+approach.
 
 ## Development
 

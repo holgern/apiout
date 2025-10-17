@@ -1,7 +1,7 @@
-import pytest
 import json
-from pathlib import Path
+
 from typer.testing import CliRunner
+
 from apiout.cli import app
 
 runner = CliRunner()
@@ -10,7 +10,7 @@ runner = CliRunner()
 def test_cli_no_config_file():
     result = runner.invoke(app, ["run", "-c", "nonexistent.toml"])
     assert result.exit_code == 1
-    assert "Config file not found" in result.stderr
+    assert "Config file not found" in result.output
 
 
 def test_cli_with_invalid_toml(tmp_path):
@@ -19,7 +19,7 @@ def test_cli_with_invalid_toml(tmp_path):
 
     result = runner.invoke(app, ["run", "-c", str(config_file)])
     assert result.exit_code == 1
-    assert "Error reading config file" in result.stderr
+    assert "Error reading config file" in result.output
 
 
 def test_cli_no_apis_section(tmp_path):
@@ -28,7 +28,7 @@ def test_cli_no_apis_section(tmp_path):
 
     result = runner.invoke(app, ["run", "-c", str(config_file)])
     assert result.exit_code == 1
-    assert "No 'apis' section found" in result.stderr
+    assert "No 'apis' section found" in result.output
 
 
 def test_cli_api_without_name(tmp_path):
@@ -37,7 +37,7 @@ def test_cli_api_without_name(tmp_path):
 
     result = runner.invoke(app, ["run", "-c", str(config_file)])
     assert result.exit_code == 1
-    assert "must have a 'name' field" in result.stderr
+    assert "must have a 'name' field" in result.output
 
 
 def test_cli_valid_config_with_mock(tmp_path, monkeypatch):

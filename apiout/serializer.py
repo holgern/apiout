@@ -1,5 +1,5 @@
 import json
-from typing import Any, Dict
+from typing import Any
 
 
 def serialize_value(obj: Any) -> Any:
@@ -33,10 +33,10 @@ def call_method_or_attr(obj: Any, name: str) -> Any:
     return attr
 
 
-def apply_field_mapping(obj: Any, field_config: Dict[str, Any]) -> Any:
+def apply_field_mapping(obj: Any, field_config: Any) -> Any:
     if isinstance(field_config, str):
         return call_method_or_attr(obj, field_config)
-    elif isinstance(field_config, dict):
+    if isinstance(field_config, dict):
         result = {}
         for key, value in field_config.items():
             if isinstance(value, str):
@@ -86,7 +86,7 @@ def apply_field_mapping(obj: Any, field_config: Dict[str, Any]) -> Any:
         return serialize_value(obj)
 
 
-def apply_config_serializer(responses: Any, serializer_config: Dict[str, Any]) -> Any:
+def apply_config_serializer(responses: Any, serializer_config: dict[str, Any]) -> Any:
     if not isinstance(responses, list):
         responses = [responses]
 
@@ -101,7 +101,7 @@ def apply_config_serializer(responses: Any, serializer_config: Dict[str, Any]) -
     return results
 
 
-def serialize_response(responses: Any, serializer_config: Dict[str, Any]) -> Any:
+def serialize_response(responses: Any, serializer_config: dict[str, Any]) -> Any:
     if serializer_config:
         return apply_config_serializer(responses, serializer_config)
     else:
