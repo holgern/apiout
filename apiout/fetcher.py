@@ -1,4 +1,5 @@
 import importlib
+import inspect
 from typing import Any, Optional
 
 from .serializer import serialize_response
@@ -40,7 +41,15 @@ def fetch_api_data(
         url = api_config.get("url", "")
         params = api_config.get("params", {})
 
-        responses = method(url, params=params)
+        sig = inspect.signature(method)
+        param_names = list(sig.parameters.keys())
+
+        if "params" in param_names:
+            responses = method(url, params=params)
+        elif len(param_names) >= 1:
+            responses = method(url)
+        else:
+            responses = method()
 
         serializer_config = resolve_serializer(api_config, global_serializers)
         return serialize_response(responses, serializer_config)
