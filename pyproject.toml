@@ -1,0 +1,71 @@
+[build-system]
+requires = ["setuptools>=45", "wheel", "setuptools_scm[toml]>=6.2"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["apiout"]
+
+[project]
+name = "apiout"
+authors = [
+  { name="Holger Nahrstaedt", email="nahrstaedt@gmail.com" },
+]
+description = "generates text from generators and provides as grid"
+keywords = ["api", "json"]
+urls = { Homepage = "https://github.com/holgern/apiout" }
+readme = "README.md"
+requires-python = ">3.8.0"
+dependencies = [
+    "typer",
+    "rich",
+    "tomli>=1.2.0;python_version<'3.11'",
+    "pydantic>=2.0.0",
+    "httpx",
+]
+license = {file = "LICENSE"}
+classifiers=[
+    'Intended Audience :: Developers',
+    'License :: OSI Approved :: MIT License',
+    'Operating System :: OS Independent',
+    'Programming Language :: Python :: 3',
+    'Programming Language :: Python :: 3.9',
+    'Programming Language :: Python :: 3.10',
+    'Programming Language :: Python :: 3.11',
+    'Programming Language :: Python :: 3.12',
+    'Topic :: Software Development :: Libraries',
+]
+
+dynamic=["version"]
+
+[project.scripts]
+apiout = "apiout.cli:app"
+
+[tool.setuptools_scm]
+write_to = "apiout/_version.py"
+
+[tool.tox]
+legacy_tox_ini = """
+
+[testenv]
+deps =
+    pytest
+    pytest-cov[all]
+commands =
+    pytest
+"""
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+exclude = [
+]

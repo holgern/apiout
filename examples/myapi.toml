@@ -1,0 +1,61 @@
+[serializers.openmeteo]
+[serializers.openmeteo.fields]
+latitude = "Latitude"
+longitude = "Longitude"
+elevation = "Elevation"
+timezone = "Timezone"
+timezone_abbreviation = "TimezoneAbbreviation"
+utc_offset_seconds = "UtcOffsetSeconds"
+
+[serializers.openmeteo.fields.current]
+method = "Current"
+[serializers.openmeteo.fields.current.fields]
+time = "Time"
+[serializers.openmeteo.fields.current.fields.variables]
+iterate = { count = "VariablesLength", item = "Variables", fields = { value = "Value" } }
+
+[serializers.openmeteo.fields.hourly]
+method = "Hourly"
+[serializers.openmeteo.fields.hourly.fields]
+time = "Time"
+time_end = "TimeEnd"
+interval = "Interval"
+[serializers.openmeteo.fields.hourly.fields.variables]
+iterate = { count = "VariablesLength", item = "Variables", fields = { values = "ValuesAsNumpy" } }
+
+[serializers.openmeteo.fields.daily]
+method = "Daily"
+[serializers.openmeteo.fields.daily.fields]
+time = "Time"
+time_end = "TimeEnd"
+interval = "Interval"
+[serializers.openmeteo.fields.daily.fields.variables]
+iterate = { count = "VariablesLength", item = "Variables", fields = { values = "ValuesAsNumpy" } }
+
+[[apis]]
+name = "berlin_weather"
+module = "openmeteo_requests"
+client_class = "Client"
+method = "weather_api"
+url = "https://api.open-meteo.com/v1/forecast"
+serializer = "openmeteo"
+
+[apis.params]
+latitude = 52.52
+longitude = 13.41
+hourly = ["temperature_2m", "precipitation", "wind_speed_10m"]
+current = ["temperature_2m", "relative_humidity_2m"]
+
+[[apis]]
+name = "munich_weather"
+module = "openmeteo_requests"
+client_class = "Client"
+method = "weather_api"
+url = "https://api.open-meteo.com/v1/forecast"
+serializer = "openmeteo"
+
+[apis.params]
+latitude = 48.1351
+longitude = 11.5820
+hourly = ["temperature_2m", "precipitation"]
+current = ["temperature_2m"]

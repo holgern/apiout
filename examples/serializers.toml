@@ -1,0 +1,33 @@
+[serializers.openmeteo]
+[serializers.openmeteo.fields]
+latitude = "Latitude"
+longitude = "Longitude"
+elevation = "Elevation"
+timezone = "Timezone"
+timezone_abbreviation = "TimezoneAbbreviation"
+utc_offset_seconds = "UtcOffsetSeconds"
+
+[serializers.openmeteo.fields.current]
+method = "Current"
+[serializers.openmeteo.fields.current.fields]
+time = "Time"
+[serializers.openmeteo.fields.current.fields.variables]
+iterate = { count = "VariablesLength", item = "Variables", fields = { value = "Value" } }
+
+[serializers.openmeteo.fields.hourly]
+method = "Hourly"
+[serializers.openmeteo.fields.hourly.fields]
+time = "Time"
+time_end = "TimeEnd"
+interval = "Interval"
+[serializers.openmeteo.fields.hourly.fields.variables]
+iterate = { count = "VariablesLength", item = "Variables", fields = { values = "ValuesAsNumpy" } }
+
+[serializers.openmeteo.fields.daily]
+method = "Daily"
+[serializers.openmeteo.fields.daily.fields]
+time = "Time"
+time_end = "TimeEnd"
+interval = "Interval"
+[serializers.openmeteo.fields.daily.fields.variables]
+iterate = { count = "VariablesLength", item = "Variables", fields = { values = "ValuesAsNumpy" } }
