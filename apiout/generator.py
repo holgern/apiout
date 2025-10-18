@@ -269,7 +269,11 @@ def introspect_and_generate(
         analysis = analyze_object(sample)
 
         if analysis.get("type") == "simple":
-            return f"# Serializer not needed: API returns a simple {analysis.get('value_type', 'value')}, use auto-serialization"
+            vtype = analysis.get("value_type", "value")
+            return (
+                f"# Serializer not needed: API returns a simple {vtype}, "
+                "use auto-serialization"
+            )
 
         fields = generate_serializer_config(analysis)
 
@@ -390,7 +394,11 @@ def introspect_post_processor_and_generate(
         analysis = analyze_object(sample)
 
         if analysis.get("type") == "simple":
-            return f"# Serializer not needed: Post-processor returns a simple {analysis.get('value_type', 'value')}, use auto-serialization"
+            vtype = analysis.get("value_type", "value")
+            return (
+                f"# Serializer not needed: Post-processor returns a simple "
+                f"{vtype}, use auto-serialization"
+            )
 
         fields = generate_serializer_config(analysis)
 

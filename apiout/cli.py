@@ -41,6 +41,37 @@ def generate_cmd(
     console.print(result)
 
 
+def _process_api(api, all_serializers, err_console):
+    if "name" not in api:
+        err_console.print("[red]Error: Each API must have a 'name' field[/red]")
+        raise typer.Exit(1)
+
+    name = api["name"]
+    module = api.get("module")
+    client_class = api.get("client_class", "Client")
+    method = api.get("method")
+    url = api.get("url", "")
+    params = api.get("params", {})
+
+    if not module or not method:
+        err_console.print(
+            f"[yellow]Warning: Skipping '{name}' - missing module or method[/yellow]"
+        )
+        return
+
+    err_console.print(f"[blue]Generating serializer for '{name}'...[/blue]")
+
+    try:
+        result = introspect_and_generate(
+            module, client_class, method, url, params, f"{name}_serializer"
+        )
+        all_serializers.append(result)
+    except Exception as e:
+        err_console.print(
+            f"[yellow]Warning: Failed to generate serializer for '{name}': {e}[/yellow]"
+        )
+
+
 @app.command("gen-config")
 def generate_from_config_cmd(
     config: Path = typer.Option(
@@ -72,34 +103,7 @@ def generate_from_config_cmd(
     all_serializers = []
 
     for api in apis:
-        if "name" not in api:
-            err_console.print("[red]Error: Each API must have a 'name' field[/red]")
-            raise typer.Exit(1)
-
-        name = api["name"]
-        module = api.get("module")
-        client_class = api.get("client_class", "Client")
-        method = api.get("method")
-        url = api.get("url", "")
-        params = api.get("params", {})
-
-        if not module or not method:
-            err_console.print(
-                f"[yellow]Warning: Skipping '{name}' - missing module or method[/yellow]"
-            )
-            continue
-
-        err_console.print(f"[blue]Generating serializer for '{name}'...[/blue]")
-
-        try:
-            result = introspect_and_generate(
-                module, client_class, method, url, params, f"{name}_serializer"
-            )
-            all_serializers.append(result)
-        except Exception as e:
-            err_console.print(
-                f"[yellow]Warning: Failed to generate serializer for '{name}': {e}[/yellow]"
-            )
+        _process_api(api, all_serializers, err_console)
 
     combined_output = "\n\n".join(all_serializers)
 
@@ -120,7 +124,8 @@ def generate_from_config_cmd(
 
         if not module or not class_name or not inputs:
             err_console.print(
-                f"[yellow]Warning: Skipping post-processor '{name}' - missing module, class, or inputs[/yellow]"
+                f"[yellow]Warning: Skipping post-processor '{name}' - "
+                "missing module, class, or inputs[/yellow]"
             )
             continue
 
@@ -161,7 +166,8 @@ def generate_from_config_cmd(
             all_serializers.append(result)
         except Exception as e:
             err_console.print(
-                f"[yellow]Warning: Failed to generate serializer for post-processor '{name}': {e}[/yellow]"
+                f"[yellow]Warning: Failed to generate serializer for "
+                f"post-processor '{name}': {e}[/yellow]"
             )
 
     combined_output = "\n\n".join(all_serializers)
