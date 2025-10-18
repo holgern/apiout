@@ -122,22 +122,19 @@ apiout run -c apis.toml --json
 
 ```bash
 apiout run -c <config.toml> [-s <serializers.toml>] [--json]
-# OR read configuration from stdin as JSON
-apiout run --json-input [--json]
+# OR pipe JSON configuration from stdin
+<json-source> | apiout run [--json]
 ```
 
 **Options:**
 
-- `-c, --config`: Path to API configuration file (required unless `--json-input` is
-  used)
+- `-c, --config`: Path to API configuration file (TOML format)
 - `-s, --serializers`: Path to serializers configuration file (optional)
 - `--json`: Output as JSON format (default: pretty-printed)
-- `--json-input`: Read configuration from stdin as JSON (alternative to `-c`)
 
-**Using JSON Input:**
+**Using JSON Input from stdin:**
 
-The `--json-input` flag allows you to pipe JSON configuration directly to apiout, which
-is useful for:
+When JSON is piped to stdin (and `-c` is not provided), apiout automatically detects and parses it. This is useful for:
 
 - Converting TOML to JSON with tools like `taplo`
 - Dynamically generating configurations
@@ -146,13 +143,13 @@ is useful for:
 Example with `taplo`:
 
 ```bash
-taplo get -f examples/mempool_apis.toml -o json | apiout run --json-input --json
+taplo get -f examples/mempool_apis.toml -o json | apiout run --json
 ```
 
 Example with inline JSON:
 
 ```bash
-echo '{"apis": [{"name": "block_height", "module": "pymempool", "client_class": "MempoolAPI", "method": "get_block_tip_height", "url": "https://mempool.space/api/"}]}' | apiout run --json-input --json
+echo '{"apis": [{"name": "block_height", "module": "pymempool", "client_class": "MempoolAPI", "method": "get_block_tip_height", "url": "https://mempool.space/api/"}]}' | apiout run --json
 ```
 
 The JSON format matches the TOML structure:

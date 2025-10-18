@@ -138,13 +138,13 @@ You can provide configuration as JSON via stdin instead of TOML files:
          "current": ["temperature_2m"]
        }
      }]
-   }' | apiout run --json-input --json
+   }' | apiout run --json
 
 Or convert TOML to JSON using ``taplo``:
 
 .. code-block:: bash
 
-   taplo get -f apis.toml -o json | apiout run --json-input --json
+   taplo get -f apis.toml -o json | apiout run --json
 
 CLI Commands
 ------------
@@ -157,14 +157,15 @@ Fetch API data with configuration:
 .. code-block:: bash
 
    apiout run -c <config.toml> [-s <serializers.toml>] [--json]
-   apiout run --json-input [--json]  # Read JSON config from stdin
+   <json-source> | apiout run [--json]  # Read JSON config from stdin
 
 **Options:**
 
 * ``-c, --config``: Path to API configuration file (TOML)
 * ``-s, --serializers``: Path to serializers configuration file (optional)
-* ``--json-input``: Read configuration from stdin as JSON
 * ``--json``: Output as JSON format (default: pretty-printed)
+
+When piping JSON to stdin (without ``-c``), apiout automatically detects and parses it.
 
 generate
 ~~~~~~~~

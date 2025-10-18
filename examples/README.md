@@ -114,7 +114,7 @@ You can provide configuration as JSON via stdin instead of TOML files:
 ```bash
 # Convert TOML to JSON with taplo
 cd examples
-taplo get -f mempool_apis.toml -o json | apiout run --json-input --json
+taplo get -f mempool_apis.toml -o json | apiout run --json
 
 # Or use inline JSON
 echo '{
@@ -124,7 +124,7 @@ echo '{
     "method": "get",
     "url": "https://api.example.com"
   }]
-}' | apiout run --json-input --json
+}' | apiout run --json
 ```
 
 This is useful for:

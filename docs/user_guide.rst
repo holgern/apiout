@@ -304,7 +304,7 @@ Instead of using TOML configuration files, you can provide JSON configuration vi
 
 .. code-block:: bash
 
-   apiout run --json-input --json < config.json
+   apiout run --json < config.json
 
 This is useful for:
 
@@ -316,13 +316,13 @@ This is useful for:
 
 .. code-block:: bash
 
-   taplo get -f apis.toml -o json | apiout run --json-input --json
+   taplo get -f apis.toml -o json | apiout run --json
 
 **Example: Inline JSON**
 
 .. code-block:: bash
 
-   echo '{"apis": [{"name": "test", "module": "requests", "method": "get", "url": "https://api.example.com"}]}' | apiout run --json-input --json
+   echo '{"apis": [{"name": "test", "module": "requests", "method": "get", "url": "https://api.example.com"}]}' | apiout run --json
 
 The JSON structure matches the TOML format exactly:
 

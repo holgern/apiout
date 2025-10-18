@@ -1,4 +1,5 @@
 import json
+import sys
 from pathlib import Path
 
 import typer
@@ -7,10 +8,10 @@ from rich.console import Console
 from .fetcher import fetch_api_data, process_post_processor
 from .generator import introspect_and_generate, introspect_post_processor_and_generate
 
-try:
+if sys.version_info >= (3, 11):
     import tomllib
-except ImportError:
-    import tomli as tomllib
+else:
+    import tomli as tomllib  # type: ignore[import-not-found]
 
 app = typer.Typer()
 console = Console()
@@ -100,7 +101,7 @@ def generate_from_config_cmd(
         raise typer.Exit(1)
 
     apis = config_data["apis"]
-    all_serializers = []
+    all_serializers: list[str] = []
 
     for api in apis:
         _process_api(api, all_serializers, err_console)
@@ -193,13 +194,12 @@ def main(
         None, "-s", "--serializers", help="Path to serializers TOML configuration file"
     ),
     json_output: bool = typer.Option(False, "--json", help="Output as JSON format"),
-    json_input: bool = typer.Option(
-        False, "--json-input", help="Read configuration from stdin as JSON"
-    ),
 ) -> None:
-    if json_input:
-        import sys
+    # Auto-detect JSON input from stdin
+    has_stdin = not sys.stdin.isatty()
 
+    if has_stdin and not config:
+        # Read from stdin as JSON
         try:
             stdin_data = sys.stdin.read()
             config_data = json.loads(stdin_data)
@@ -209,7 +209,7 @@ def main(
     else:
         if not config:
             err_console.print(
-                "[red]Error: Either --config or --json-input must be provided[/red]"
+                "[red]Error: --config must be provided (or pipe JSON to stdin)[/red]"
             )
             raise typer.Exit(1)
 
