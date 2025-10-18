@@ -39,14 +39,14 @@ def analyze_object(
     if visited is None:
         visited = set()
 
+    if is_simple_type(obj):
+        return {"type": "simple", "value_type": type(obj).__name__}
+
     obj_id = id(obj)
     if obj_id in visited or current_depth >= max_depth:
         return {}
 
     visited.add(obj_id)
-
-    if is_simple_type(obj):
-        return {"type": "simple", "value_type": type(obj).__name__}
 
     if is_collection(obj):
         if len(obj) > 0:
@@ -55,6 +55,15 @@ def analyze_object(
             )
             return {"type": "collection", "item": item_analysis}
         return {"type": "collection", "item": {}}
+
+    if isinstance(obj, dict):
+        return {
+            "type": "dict",
+            "keys": {
+                k: analyze_object(v, max_depth, current_depth + 1, visited)
+                for k, v in obj.items()
+            },
+        }
 
     methods, attrs = get_methods_and_attrs(obj)
 
@@ -108,6 +117,13 @@ def generate_serializer_config(  # noqa: C901
     if analysis.get("type") == "collection":
         return {}
 
+    if analysis.get("type") == "dict":
+        fields = {}
+        for key, value_info in analysis.get("keys", {}).items():
+            if value_info.get("type") == "simple":
+                fields[key] = key
+        return fields
+
     if analysis.get("type") != "object":
         return {}
 
@@ -115,7 +131,7 @@ def generate_serializer_config(  # noqa: C901
 
     for method_name, method_info in analysis.get("methods", {}).items():
         if method_info.get("type") == "simple":
-            fields[method_name.lower()] = method_name
+            fields[method_name] = method_name
 
         elif method_info.get("type") == "indexed_method":
             continue
@@ -154,9 +170,9 @@ def generate_serializer_config(  # noqa: C901
                     item_fields = {}
                     for m_name, m_info in method_info.get("methods", {}).items():
                         if m_info.get("type") == "simple":
-                            item_fields[m_name.lower()] = m_name
+                            item_fields[m_name] = m_name
 
-                    fields[method_name.lower()] = {
+                    fields[method_name] = {
                         "method": method_name,
                         "iterate": {
                             "count": count_method,
@@ -169,7 +185,7 @@ def generate_serializer_config(  # noqa: C901
                         method_info, f"{prefix}{method_name}."
                     )
                     if nested_config:
-                        fields[method_name.lower()] = {
+                        fields[method_name] = {
                             "method": method_name,
                             "fields": nested_config,
                         }
@@ -178,14 +194,14 @@ def generate_serializer_config(  # noqa: C901
                     method_info, f"{prefix}{method_name}."
                 )
                 if nested_config:
-                    fields[method_name.lower()] = {
+                    fields[method_name] = {
                         "method": method_name,
                         "fields": nested_config,
                     }
 
     for attr_name, attr_info in analysis.get("attributes", {}).items():
         if attr_info.get("type") == "simple":
-            fields[attr_name.lower()] = attr_name
+            fields[attr_name] = attr_name
 
     return fields
 
@@ -237,7 +253,13 @@ def introspect_and_generate(
         client = client_cls()
         method = getattr(client, method_name)
 
-        response = method(url, params=params)
+        sig = inspect.signature(method)
+        method_params = list(sig.parameters.keys())
+
+        if "params" in method_params:
+            response = method(url, params=params)
+        else:
+            response = method()
 
         if isinstance(response, list) and len(response) > 0:
             sample = response[0]
@@ -245,6 +267,9 @@ def introspect_and_generate(
             sample = response
 
         analysis = analyze_object(sample)
+
+        if analysis.get("type") == "simple":
+            return f"# Serializer not needed: API returns a simple {analysis.get('value_type', 'value')}, use auto-serialization"
 
         fields = generate_serializer_config(analysis)
 
@@ -305,3 +330,124 @@ def introspect_and_generate(
 
     except Exception as e:
         return f"# Error generating serializer: {e}"
+
+
+def introspect_post_processor_and_generate(
+    module_name: str,
+    class_name: str,
+    method_name: str,
+    input_modules: list[dict[str, Any]],
+    serializer_name: str = "generated",
+) -> str:
+    """
+    Generate serializer for a post-processor by calling it with sample data.
+
+    Args:
+        module_name: Module containing the post-processor class
+        class_name: Post-processor class name
+        method_name: Optional method to call on the instance
+        input_modules: List of dicts with 'module', 'client_class', 'method' keys
+        serializer_name: Name for the generated serializer
+    """
+    try:
+        # Fetch sample data from all input APIs
+        input_data = []
+        for input_config in input_modules:
+            input_module = importlib.import_module(input_config["module"])
+            input_client_cls = getattr(input_module, input_config["client_class"])
+            input_client = input_client_cls()
+            input_method = getattr(input_client, input_config["method"])
+
+            sig = inspect.signature(input_method)
+            method_params = list(sig.parameters.keys())
+
+            if "params" in method_params:
+                response = input_method(
+                    input_config.get("url", ""), params=input_config.get("params", {})
+                )
+            else:
+                response = input_method()
+
+            input_data.append(response)
+
+        # Instantiate post-processor with sample data
+        module = importlib.import_module(module_name)
+        processor_class = getattr(module, class_name)
+
+        if method_name:
+            processor_instance = processor_class()
+            method = getattr(processor_instance, method_name)
+            result = method(*input_data)
+        else:
+            result = processor_class(*input_data)
+
+        # Analyze the result
+        if isinstance(result, list) and len(result) > 0:
+            sample = result[0]
+        else:
+            sample = result
+
+        analysis = analyze_object(sample)
+
+        if analysis.get("type") == "simple":
+            return f"# Serializer not needed: Post-processor returns a simple {analysis.get('value_type', 'value')}, use auto-serialization"
+
+        fields = generate_serializer_config(analysis)
+
+        toml_output = f"[serializers.{serializer_name}]\n"
+        toml_output += f"[serializers.{serializer_name}.fields]\n"
+
+        simple_fields = {k: v for k, v in fields.items() if isinstance(v, str)}
+        for key, value in simple_fields.items():
+            toml_output += f'{key} = "{value}"\n'
+
+        complex_fields: dict[str, Any] = {
+            k: v for k, v in fields.items() if isinstance(v, dict)
+        }
+        for key, value in complex_fields.items():
+            if not isinstance(value, dict):
+                continue
+            toml_output += f"\n[serializers.{serializer_name}.fields.{key}]\n"
+            toml_output += f'method = "{value["method"]}"\n'
+
+            if "fields" in value:
+                toml_output += f"[serializers.{serializer_name}.fields.{key}.fields]\n"
+                for fk, fv in value["fields"].items():
+                    if isinstance(fv, str):
+                        toml_output += f'{fk} = "{fv}"\n'
+                    elif isinstance(fv, dict) and "iterate" in fv:
+                        iterate = fv["iterate"]
+                        fields_str = ", ".join(
+                            [
+                                f'{k} = "{v}"'
+                                for k, v in iterate.get("fields", {}).items()
+                            ]
+                        )
+                        toml_output += (
+                            f"[serializers.{serializer_name}.fields.{key}."
+                            f"fields.variables]\n"
+                        )
+                        toml_output += (
+                            f'iterate = {{ count = "{iterate["count"]}", '
+                            f'item = "{iterate["item"]}", '
+                            f"fields = {{ {fields_str} }} }}\n"
+                        )
+
+            if "iterate" in value:
+                iterate = value["iterate"]
+                fields_str = ", ".join(
+                    [f'{k} = "{v}"' for k, v in iterate.get("fields", {}).items()]
+                )
+                toml_output += (
+                    f"[serializers.{serializer_name}.fields.{key}.fields.variables]\n"
+                )
+                toml_output += (
+                    f'iterate = {{ count = "{iterate["count"]}", '
+                    f'item = "{iterate["item"]}", '
+                    f"fields = {{ {fields_str} }} }}\n"
+                )
+
+        return toml_output
+
+    except Exception as e:
+        return f"# Error generating post-processor serializer: {e}"
