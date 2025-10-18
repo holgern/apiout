@@ -4,7 +4,7 @@ from pathlib import Path
 import typer
 from rich.console import Console
 
-from .fetcher import fetch_api_data
+from .fetcher import fetch_api_data, process_post_processor
 from .generator import introspect_and_generate
 
 try:
@@ -87,6 +87,19 @@ def main(
 
         name = api["name"]
         results[name] = fetch_api_data(api, global_serializers)
+
+    post_processors = config_data.get("post_processors", [])
+    for post_processor in post_processors:
+        if "name" not in post_processor:
+            err_console.print(
+                "[red]Error: Each post-processor must have a 'name' field[/red]"
+            )
+            raise typer.Exit(1)
+
+        name = post_processor["name"]
+        results[name] = process_post_processor(
+            post_processor, results, global_serializers
+        )
 
     if json_output:
         print(json.dumps(results, indent=2))

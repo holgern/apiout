@@ -172,3 +172,68 @@ external_field = "ExternalValue"
     call_args = mock_fetch.call_args[0]
     assert "inline" in call_args[1]
     assert "external" in call_args[1]
+
+
+def test_cli_with_post_processor(tmp_path, monkeypatch):
+    from unittest.mock import Mock
+
+    mock_fetch = Mock(side_effect=[{"value": 1}, {"value": 2}])
+    mock_process = Mock(return_value={"combined": 3})
+    monkeypatch.setattr("apiout.cli.fetch_api_data", mock_fetch)
+    monkeypatch.setattr("apiout.cli.process_post_processor", mock_process)
+
+    config_file = tmp_path / "config.toml"
+    config_file.write_text(
+        """
+[[apis]]
+name = "api1"
+module = "mod1"
+method = "meth1"
+
+[[apis]]
+name = "api2"
+module = "mod2"
+method = "meth2"
+
+[[post_processors]]
+name = "processor1"
+module = "processor_mod"
+class = "ProcessorClass"
+inputs = ["api1", "api2"]
+"""
+    )
+
+    result = runner.invoke(app, ["run", "-c", str(config_file), "--json"])
+    assert result.exit_code == 0
+
+    output = json.loads(result.stdout)
+    assert "api1" in output
+    assert "api2" in output
+    assert "processor1" in output
+    assert output["processor1"] == {"combined": 3}
+
+
+def test_cli_post_processor_without_name(tmp_path, monkeypatch):
+    from unittest.mock import Mock
+
+    mock_fetch = Mock(return_value={"value": 1})
+    monkeypatch.setattr("apiout.cli.fetch_api_data", mock_fetch)
+
+    config_file = tmp_path / "config.toml"
+    config_file.write_text(
+        """
+[[apis]]
+name = "api1"
+module = "mod1"
+method = "meth1"
+
+[[post_processors]]
+module = "processor_mod"
+class = "ProcessorClass"
+inputs = ["api1"]
+"""
+    )
+
+    result = runner.invoke(app, ["run", "-c", str(config_file)])
+    assert result.exit_code == 1
+    assert "must have a 'name' field" in result.output

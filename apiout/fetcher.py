@@ -60,3 +60,53 @@ def fetch_api_data(
         return {"error": f"Failed to access class or method: {e}"}
     except Exception as e:
         return {"error": f"Failed to fetch data: {e}"}
+
+
+def process_post_processor(
+    post_processor_config: dict[str, Any],
+    api_results: dict[str, Any],
+    global_serializers: Optional[dict[str, Any]] = None,
+) -> Any:
+    try:
+        module_name = post_processor_config.get("module")
+        if not module_name:
+            return {"error": "No module specified for post-processor"}
+
+        class_name = post_processor_config.get("class")
+        if not class_name:
+            return {"error": "No class specified for post-processor"}
+
+        inputs = post_processor_config.get("inputs", [])
+        if not inputs:
+            return {"error": "No inputs specified for post-processor"}
+
+        for input_name in inputs:
+            if input_name not in api_results:
+                return {
+                    "error": f"Required input '{input_name}' not found in API results"
+                }
+
+        module = importlib.import_module(module_name)
+        processor_class = getattr(module, class_name)
+
+        input_data = [api_results[input_name] for input_name in inputs]
+
+        method_name = post_processor_config.get("method")
+        if method_name:
+            processor_instance = processor_class()
+            method = getattr(processor_instance, method_name)
+            result = method(*input_data)
+        else:
+            result = processor_class(*input_data)
+
+        serializer_config = resolve_serializer(
+            post_processor_config, global_serializers
+        )
+        return serialize_response(result, serializer_config)
+
+    except ImportError as e:
+        return {"error": f"Failed to import post-processor module: {e}"}
+    except AttributeError as e:
+        return {"error": f"Failed to access post-processor class or method: {e}"}
+    except Exception as e:
+        return {"error": f"Failed to process post-processor: {e}"}
