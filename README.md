@@ -134,7 +134,8 @@ apiout run -c <config.toml> [-s <serializers.toml>] [--json]
 
 **Using JSON Input from stdin:**
 
-When JSON is piped to stdin (and `-c` is not provided), apiout automatically detects and parses it. This is useful for:
+When JSON is piped to stdin (and `-c` is not provided), apiout automatically detects and
+parses it. This is useful for:
 
 - Converting TOML to JSON with tools like `taplo`
 - Dynamically generating configurations
