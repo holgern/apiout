@@ -187,23 +187,42 @@ def generate_from_config_cmd(
 @app.command("run", help="Run API fetcher with config file")
 def main(
     config: Path = typer.Option(
-        ..., "-c", "--config", help="Path to TOML configuration file"
+        None, "-c", "--config", help="Path to TOML configuration file"
     ),
     serializers: Path = typer.Option(
         None, "-s", "--serializers", help="Path to serializers TOML configuration file"
     ),
     json_output: bool = typer.Option(False, "--json", help="Output as JSON format"),
+    json_input: bool = typer.Option(
+        False, "--json-input", help="Read configuration from stdin as JSON"
+    ),
 ) -> None:
-    if not config.exists():
-        err_console.print(f"[red]Error: Config file not found: {config}[/red]")
-        raise typer.Exit(1)
+    if json_input:
+        import sys
 
-    try:
-        with open(config, "rb") as f:
-            config_data = tomllib.load(f)
-    except Exception as e:
-        err_console.print(f"[red]Error reading config file: {e}[/red]")
-        raise typer.Exit(1) from e
+        try:
+            stdin_data = sys.stdin.read()
+            config_data = json.loads(stdin_data)
+        except json.JSONDecodeError as e:
+            err_console.print(f"[red]Error: Invalid JSON from stdin: {e}[/red]")
+            raise typer.Exit(1) from e
+    else:
+        if not config:
+            err_console.print(
+                "[red]Error: Either --config or --json-input must be provided[/red]"
+            )
+            raise typer.Exit(1)
+
+        if not config.exists():
+            err_console.print(f"[red]Error: Config file not found: {config}[/red]")
+            raise typer.Exit(1)
+
+        try:
+            with open(config, "rb") as f:
+                config_data = tomllib.load(f)
+        except Exception as e:
+            err_console.print(f"[red]Error reading config file: {e}[/red]")
+            raise typer.Exit(1) from e
 
     if "apis" not in config_data or not config_data["apis"]:
         err_console.print("[red]Error: No 'apis' section found in config file[/red]")

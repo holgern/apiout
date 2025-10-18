@@ -1,0 +1,53 @@
+# Serializer not needed: API returns a simple str, use auto-serialization
+
+# Serializer not needed: API returns a simple int, use auto-serialization
+
+[serializers.recommended_fees_serializer]
+[serializers.recommended_fees_serializer.fields]
+fastestFee = "fastestFee"
+halfHourFee = "halfHourFee"
+hourFee = "hourFee"
+economyFee = "economyFee"
+minimumFee = "minimumFee"
+
+
+[serializers.difficulty_adjustment_serializer]
+[serializers.difficulty_adjustment_serializer.fields]
+progressPercent = "progressPercent"
+difficultyChange = "difficultyChange"
+estimatedRetargetDate = "estimatedRetargetDate"
+remainingBlocks = "remainingBlocks"
+remainingTime = "remainingTime"
+previousRetarget = "previousRetarget"
+previousTime = "previousTime"
+nextRetargetHeight = "nextRetargetHeight"
+timeAvg = "timeAvg"
+adjustedTimeAvg = "adjustedTimeAvg"
+timeOffset = "timeOffset"
+expectedBlocks = "expectedBlocks"
+
+
+[serializers.mempool_blocks_fee_serializer]
+[serializers.mempool_blocks_fee_serializer.fields]
+blockSize = "blockSize"
+blockVSize = "blockVSize"
+nTx = "nTx"
+totalFees = "totalFees"
+medianFee = "medianFee"
+
+
+[serializers.fee_analysis_serializer]
+[serializers.fee_analysis_serializer.fields]
+default_fee = "default_fee"
+economy_fee = "economy_fee"
+fastest_fee = "fastest_fee"
+half_hour_fee = "half_hour_fee"
+hour_fee = "hour_fee"
+max_mempool_mb = "max_mempool_mb"
+mempool_blocks = "mempool_blocks"
+mempool_size_gb = "mempool_size_gb"
+mempool_size_mb = "mempool_size_mb"
+mempool_tx_count = "mempool_tx_count"
+mempool_vsize = "mempool_vsize"
+minimum_fee = "minimum_fee"
+n_fee_blocks = "n_fee_blocks"

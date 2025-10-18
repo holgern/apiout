@@ -386,3 +386,79 @@ Combining Multiple APIs
      apiout run -c stocks.toml --json | jq -r '.stock_data'
      echo "}"
    } | jq -s '.[0]'
+
+Post-Processor Example
+----------------------
+
+Combining Multiple API Results
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Post-processors allow you to combine and transform data from multiple API calls using any Python class.
+
+**Configuration**
+
+``mempool_apis.toml``:
+
+.. code-block:: toml
+
+   [[apis]]
+   name = "recommended_fees"
+   module = "pymempool"
+   client_class = "MempoolAPI"
+   method = "get_recommended_fees"
+   url = "https://mempool.space/api/"
+
+   [[apis]]
+   name = "mempool_blocks_fee"
+   module = "pymempool"
+   client_class = "MempoolAPI"
+   method = "get_mempool_blocks_fee"
+   url = "https://mempool.space/api/"
+
+   [[post_processors]]
+   name = "fee_analysis"
+   module = "pymempool"
+   class = "RecommendedFees"
+   inputs = ["recommended_fees", "mempool_blocks_fee"]
+   serializer = "fee_analysis_serializer"
+
+**Running the Example**
+
+.. code-block:: bash
+
+   pip install pymempool
+   apiout run -c mempool_apis.toml -s mempool_serializers.toml --json
+
+**How It Works**
+
+1. Both APIs are fetched first: ``recommended_fees`` and ``mempool_blocks_fee``
+2. The post-processor instantiates ``pymempool.RecommendedFees`` with both results
+3. The output is serialized using ``fee_analysis_serializer``
+4. The result appears in the output under the name ``fee_analysis``
+
+**Configuration Format**
+
+.. code-block:: toml
+
+   [[post_processors]]
+   name = "processor_name"          # Required: unique identifier
+   module = "module_name"           # Required: Python module
+   class = "ClassName"              # Required: class to instantiate
+   method = "method_name"           # Optional: method to call
+   inputs = ["api1", "api2"]        # Required: list of API names
+   serializer = "serializer_name"   # Optional: serializer reference
+
+**Key Features**
+
+* Use any existing Python class from installed packages
+* Combine data from multiple API calls
+* Chain multiple post-processors together
+* Optional serialization of output
+* Later post-processors can reference earlier ones
+
+**Example Use Cases**
+
+* Combining fee data from multiple endpoints (as shown above)
+* Calculating statistics across multiple API responses
+* Aggregating data from different sources
+* Transforming API responses into domain objects

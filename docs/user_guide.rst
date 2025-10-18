@@ -207,6 +207,70 @@ If no serializer is specified, apiout uses default serialization:
 Advanced Features
 -----------------
 
+Post-Processors
+~~~~~~~~~~~~~~~
+
+Post-processors allow you to combine and transform data from multiple API calls using any Python class.
+
+Configuration Format
+^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: toml
+
+   [[post_processors]]
+   name = "processor_name"          # Required: unique identifier
+   module = "module_name"           # Required: Python module
+   class = "ClassName"              # Required: class to instantiate
+   method = "method_name"           # Optional: method to call
+   inputs = ["api1", "api2"]        # Required: list of API names
+   serializer = "serializer_name"   # Optional: serializer reference
+
+Execution Order
+^^^^^^^^^^^^^^^
+
+1. All ``[[apis]]`` are fetched first and stored in a results dictionary
+2. Post-processors execute in the order they appear in the configuration
+3. Each post-processor receives the specified API results as arguments
+4. The class is instantiated with the inputs (or a method is called if specified)
+5. The result is optionally serialized
+6. The result is added to the output under the post-processor's name
+7. Later post-processors can reference outputs from earlier ones
+
+Example
+^^^^^^^
+
+.. code-block:: toml
+
+   [[apis]]
+   name = "recommended_fees"
+   module = "pymempool"
+   client_class = "MempoolAPI"
+   method = "get_recommended_fees"
+   url = "https://mempool.space/api/"
+
+   [[apis]]
+   name = "mempool_blocks_fee"
+   module = "pymempool"
+   client_class = "MempoolAPI"
+   method = "get_mempool_blocks_fee"
+   url = "https://mempool.space/api/"
+
+   [[post_processors]]
+   name = "fee_analysis"
+   module = "pymempool"
+   class = "RecommendedFees"
+   inputs = ["recommended_fees", "mempool_blocks_fee"]
+   serializer = "fee_analysis_serializer"
+
+Benefits
+^^^^^^^^
+
+* **Declarative Configuration**: Define data transformation in TOML instead of code
+* **Reusability**: Post-processors can be reused across different configurations
+* **Modularity**: Separate data fetching from data processing
+* **Composability**: Chain multiple post-processors together
+* **Integration**: Use any existing Python class from installed packages
+
 NumPy Array Handling
 ~~~~~~~~~~~~~~~~~~~~
 
@@ -232,6 +296,60 @@ The generator tool introspects API responses and generates serializer configurat
      --name openmeteo > serializers.toml
 
 This outputs a TOML serializer configuration that you can refine manually.
+
+JSON Input
+~~~~~~~~~~
+
+Instead of using TOML configuration files, you can provide JSON configuration via stdin:
+
+.. code-block:: bash
+
+   apiout run --json-input --json < config.json
+
+This is useful for:
+
+* Converting TOML to JSON with tools like ``taplo``
+* Dynamically generating configurations
+* Integration with JSON-based workflows
+
+**Example: Convert TOML to JSON**
+
+.. code-block:: bash
+
+   taplo get -f apis.toml -o json | apiout run --json-input --json
+
+**Example: Inline JSON**
+
+.. code-block:: bash
+
+   echo '{"apis": [{"name": "test", "module": "requests", "method": "get", "url": "https://api.example.com"}]}' | apiout run --json-input --json
+
+The JSON structure matches the TOML format exactly:
+
+.. code-block:: json
+
+   {
+     "apis": [
+       {
+         "name": "api_name",
+         "module": "module_name",
+         "client_class": "Client",
+         "method": "method_name",
+         "url": "https://api.url",
+         "serializer": "serializer_ref",
+         "params": {
+           "key": "value"
+         }
+       }
+     ],
+     "serializers": {
+       "serializer_name": {
+         "fields": {
+           "output_field": "InputAttribute"
+         }
+       }
+     }
+   }
 
 Output Formats
 ~~~~~~~~~~~~~~

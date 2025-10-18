@@ -122,13 +122,57 @@ apiout run -c apis.toml --json
 
 ```bash
 apiout run -c <config.toml> [-s <serializers.toml>] [--json]
+# OR read configuration from stdin as JSON
+apiout run --json-input [--json]
 ```
 
 **Options:**
 
-- `-c, --config`: Path to API configuration file (required)
+- `-c, --config`: Path to API configuration file (required unless `--json-input` is
+  used)
 - `-s, --serializers`: Path to serializers configuration file (optional)
 - `--json`: Output as JSON format (default: pretty-printed)
+- `--json-input`: Read configuration from stdin as JSON (alternative to `-c`)
+
+**Using JSON Input:**
+
+The `--json-input` flag allows you to pipe JSON configuration directly to apiout, which
+is useful for:
+
+- Converting TOML to JSON with tools like `taplo`
+- Dynamically generating configurations
+- Integration with other tools and scripts
+
+Example with `taplo`:
+
+```bash
+taplo get -f examples/mempool_apis.toml -o json | apiout run --json-input --json
+```
+
+Example with inline JSON:
+
+```bash
+echo '{"apis": [{"name": "block_height", "module": "pymempool", "client_class": "MempoolAPI", "method": "get_block_tip_height", "url": "https://mempool.space/api/"}]}' | apiout run --json-input --json
+```
+
+The JSON format matches the TOML structure:
+
+```json
+{
+  "apis": [
+    {
+      "name": "api_name",
+      "module": "module_name",
+      "client_class": "Client",
+      "method": "method_name",
+      "url": "https://api.url",
+      "params": {}
+    }
+  ],
+  "post_processors": [...],
+  "serializers": {...}
+}
+```
 
 ### `generate` - Generate Serializer Config
 
@@ -229,6 +273,85 @@ The serializer automatically converts NumPy arrays to lists:
 [serializers.example.fields.data]
 values = "ValuesAsNumpy"  # Returns numpy array, auto-converted to list
 ```
+
+## Post-Processors
+
+Post-processors allow you to combine and transform data from multiple API calls into a
+single result. This is useful when you need to:
+
+- Aggregate data from multiple endpoints
+- Perform calculations using multiple API responses
+- Create custom data structures from API results
+
+### Configuration Format
+
+```toml
+[[post_processors]]
+name = "processor_name"          # Unique identifier
+module = "module_name"           # Python module containing the processor
+class = "ProcessorClass"         # Class to instantiate
+method = "process"               # Optional: method to call (default: use __init__)
+inputs = ["api1", "api2"]        # List of API result names to pass as inputs
+serializer = "serializer_ref"    # Optional: serializer for the output
+```
+
+### How It Works
+
+1. All APIs defined in `[[apis]]` sections are fetched first
+2. Post-processors are executed in order, receiving API results as inputs
+3. Each post-processor's result is added to the results dictionary
+4. Later post-processors can use outputs from earlier post-processors
+
+### Example: Combining Mempool Data
+
+This example uses the `pymempool` library's built-in `RecommendedFees` class as a
+post-processor:
+
+```toml
+# Define the APIs
+[[apis]]
+name = "recommended_fees"
+module = "pymempool"
+client_class = "MempoolAPI"
+method = "get_recommended_fees"
+url = "https://mempool.space/api/"
+
+[[apis]]
+name = "mempool_blocks_fee"
+module = "pymempool"
+client_class = "MempoolAPI"
+method = "get_mempool_blocks_fee"
+url = "https://mempool.space/api/"
+
+# Define the post-processor using pymempool's RecommendedFees class
+[[post_processors]]
+name = "fee_analysis"
+module = "pymempool"
+class = "RecommendedFees"
+inputs = ["recommended_fees", "mempool_blocks_fee"]
+serializer = "fee_analysis_serializer"
+```
+
+Define the serializer for the post-processor output:
+
+```toml
+[serializers.fee_analysis_serializer]
+[serializers.fee_analysis_serializer.fields]
+fastest_fee = "fastest_fee"
+half_hour_fee = "half_hour_fee"
+hour_fee = "hour_fee"
+mempool_tx_count = "mempool_tx_count"
+mempool_vsize = "mempool_vsize"
+mempool_blocks = "mempool_blocks"
+```
+
+Run it:
+
+```bash
+apiout run -c mempool_apis.toml -s mempool_serializers.toml --json
+```
+
+The output will include the `fee_analysis` result with all combined data from both APIs.
 
 ## Examples
 
