@@ -1,0 +1,200 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/apiout/apiout/main/schemas/apiout.json",
+  "title": "apiout Configuration",
+  "description": "Configuration schema for apiout - a tool for fetching and serializing API data",
+  "type": "object",
+  "properties": {
+    "apis": {
+      "type": "array",
+      "description": "List of API configurations to fetch",
+      "items": {
+        "$ref": "#/definitions/api"
+      }
+    },
+    "serializers": {
+      "type": "object",
+      "description": "Named serializer configurations for transforming API responses",
+      "additionalProperties": {
+        "$ref": "#/definitions/serializer"
+      }
+    },
+    "post_processors": {
+      "type": "array",
+      "description": "List of post-processors to combine and transform API results",
+      "items": {
+        "$ref": "#/definitions/post_processor"
+      }
+    }
+  },
+  "definitions": {
+    "api": {
+      "type": "object",
+      "description": "Configuration for a single API call",
+      "required": ["name", "module", "method"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Unique identifier for this API"
+        },
+        "module": {
+          "type": "string",
+          "description": "Python module to import"
+        },
+        "client_class": {
+          "type": "string",
+          "description": "Name of the client class (default: 'Client')",
+          "default": "Client"
+        },
+        "method": {
+          "type": "string",
+          "description": "Method to call on the client instance"
+        },
+        "url": {
+          "type": "string",
+          "description": "API endpoint URL",
+          "format": "uri"
+        },
+        "client_id": {
+          "type": "string",
+          "description": "Identifier for sharing client instances across multiple API calls"
+        },
+        "init_method": {
+          "type": "string",
+          "description": "Method to call once after client instantiation (requires client_id)"
+        },
+        "init_params": {
+          "type": "object",
+          "description": "Parameters to pass to the client class constructor (requires client_id)",
+          "additionalProperties": true
+        },
+        "params": {
+          "type": "object",
+          "description": "Parameters to pass to the API method",
+          "additionalProperties": true
+        },
+        "serializer": {
+          "description": "Reference to a serializer configuration (string) or inline serializer (object)",
+          "oneOf": [
+            {
+              "type": "string",
+              "description": "Name of a serializer defined in the serializers section"
+            },
+            {
+              "$ref": "#/definitions/serializer",
+              "description": "Inline serializer configuration"
+            }
+          ]
+        }
+      },
+      "additionalProperties": true
+    },
+    "serializer": {
+      "type": "object",
+      "description": "Configuration for serializing API response objects",
+      "properties": {
+        "fields": {
+          "type": "object",
+          "description": "Field mappings from response object to output",
+          "additionalProperties": {
+            "$ref": "#/definitions/field_mapping"
+          }
+        }
+      }
+    },
+    "field_mapping": {
+      "description": "Mapping for a single field",
+      "oneOf": [
+        {
+          "type": "string",
+          "description": "Simple attribute or method name to access"
+        },
+        {
+          "type": "object",
+          "description": "Complex field mapping with method calls, nested fields, or iteration",
+          "properties": {
+            "method": {
+              "type": "string",
+              "description": "Method name to call on the object"
+            },
+            "fields": {
+              "type": "object",
+              "description": "Nested field mappings",
+              "additionalProperties": {
+                "$ref": "#/definitions/field_mapping"
+              }
+            },
+            "iterate": {
+              "type": "object",
+              "description": "Configuration for iterating over collections",
+              "required": ["count", "item", "fields"],
+              "properties": {
+                "count": {
+                  "type": "string",
+                  "description": "Method or attribute returning the number of items"
+                },
+                "item": {
+                  "type": "string",
+                  "description": "Method name that takes an index parameter to get an item"
+                },
+                "fields": {
+                  "type": "object",
+                  "description": "Field mappings to extract from each item",
+                  "additionalProperties": {
+                    "$ref": "#/definitions/field_mapping"
+                  }
+                }
+              },
+              "additionalProperties": false
+            }
+          }
+        }
+      ]
+    },
+    "post_processor": {
+      "type": "object",
+      "description": "Configuration for post-processing API results",
+      "required": ["name", "module", "class", "inputs"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Unique identifier for this post-processor"
+        },
+        "module": {
+          "type": "string",
+          "description": "Python module containing the processor class"
+        },
+        "class": {
+          "type": "string",
+          "description": "Name of the class to instantiate"
+        },
+        "method": {
+          "type": "string",
+          "description": "Optional method to call on the instantiated class"
+        },
+        "inputs": {
+          "type": "array",
+          "description": "List of API names or previous post-processor names to use as inputs",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        },
+        "serializer": {
+          "description": "Reference to a serializer configuration (string) or inline serializer (object)",
+          "oneOf": [
+            {
+              "type": "string",
+              "description": "Name of a serializer defined in the serializers section"
+            },
+            {
+              "$ref": "#/definitions/serializer",
+              "description": "Inline serializer configuration"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
