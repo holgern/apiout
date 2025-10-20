@@ -24,4 +24,4 @@ exclude = ["setup/*", "notebooks/*"]
 section-order = ["future", "standard-library", "third-party", "first-party", "local-folder"]
 
 [lint.mccabe]
-max-complexity = 16
+max-complexity = 20

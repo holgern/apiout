@@ -19,8 +19,13 @@ def resolve_serializer(
 
 
 def fetch_api_data(
-    api_config: dict[str, Any], global_serializers: Optional[dict[str, Any]] = None
+    api_config: dict[str, Any],
+    global_serializers: Optional[dict[str, Any]] = None,
+    shared_clients: Optional[dict[str, Any]] = None,
 ) -> Any:
+    if shared_clients is None:
+        shared_clients = {}
+
     try:
         module_name = api_config.get("module")
         if not module_name:
@@ -33,8 +38,26 @@ def fetch_api_data(
         module = importlib.import_module(module_name)
 
         client_class_name = api_config.get("client_class", "Client")
-        client_class = getattr(module, client_class_name)
-        client = client_class()
+        client_id = api_config.get("client_id")
+
+        if client_id and client_id in shared_clients:
+            client = shared_clients[client_id]
+        else:
+            client_class = getattr(module, client_class_name)
+
+            init_params = api_config.get("init_params", {})
+            if init_params:
+                client = client_class(**init_params)
+            else:
+                client = client_class()
+
+            init_method_name = api_config.get("init_method")
+            if init_method_name:
+                init_method = getattr(client, init_method_name)
+                init_method()
+
+            if client_id:
+                shared_clients[client_id] = client
 
         method = getattr(client, method_name)
 

@@ -128,3 +128,67 @@ def test_resolve_serializer_string_not_found():
     result = resolve_serializer(api_config, global_serializers)
 
     assert result == {}
+
+
+@patch("apiout.fetcher.importlib.import_module")
+def test_fetch_api_data_with_shared_client(mock_import):
+    mock_client = Mock()
+    mock_client.init_method = Mock()
+    mock_client.method1 = Mock(return_value="result1")
+    mock_client.method2 = Mock(return_value="result2")
+
+    mock_module = Mock()
+    mock_module.Client = Mock(return_value=mock_client)
+    mock_import.return_value = mock_module
+
+    shared_clients = {}
+
+    config1 = {
+        "module": "test_module",
+        "client_class": "Client",
+        "client_id": "shared_client",
+        "init_method": "init_method",
+        "init_params": {"param": "value"},
+        "method": "method1",
+    }
+
+    result1 = fetch_api_data(config1, shared_clients=shared_clients)
+    assert result1 == "result1"
+    mock_module.Client.assert_called_once_with(param="value")
+    mock_client.init_method.assert_called_once()
+
+    config2 = {
+        "module": "test_module",
+        "client_class": "Client",
+        "client_id": "shared_client",
+        "method": "method2",
+    }
+
+    result2 = fetch_api_data(config2, shared_clients=shared_clients)
+    assert result2 == "result2"
+    assert mock_module.Client.call_count == 1
+    assert mock_client.init_method.call_count == 1
+
+
+@patch("apiout.fetcher.importlib.import_module")
+def test_fetch_api_data_shared_client_without_init(mock_import):
+    mock_client = Mock()
+    mock_client.method = Mock(return_value="result")
+
+    mock_module = Mock()
+    mock_module.Client = Mock(return_value=mock_client)
+    mock_import.return_value = mock_module
+
+    shared_clients = {}
+
+    config = {
+        "module": "test_module",
+        "client_class": "Client",
+        "client_id": "shared_client",
+        "method": "method",
+    }
+
+    result = fetch_api_data(config, shared_clients=shared_clients)
+    assert result == "result"
+    mock_module.Client.assert_called_once_with()
+    assert "shared_client" in shared_clients

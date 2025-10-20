@@ -1,6 +1,7 @@
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 import typer
 from rich.console import Console
@@ -42,6 +43,59 @@ def generate_cmd(
     console.print(result)
 
 
+def _load_config_files(config_paths: list[Path]) -> dict[str, Any]:
+    config_data: dict[str, Any] = {
+        "apis": [],
+        "serializers": {},
+        "post_processors": [],
+    }
+
+    for config_path in config_paths:
+        if not config_path.exists():
+            err_console.print(f"[red]Error: Config file not found: {config_path}[/red]")
+            raise typer.Exit(1)
+
+        try:
+            with open(config_path, "rb") as f:
+                current_config = tomllib.load(f)
+
+                if "apis" in current_config:
+                    config_data["apis"].extend(current_config["apis"])
+
+                if "serializers" in current_config:
+                    config_data["serializers"].update(current_config["serializers"])
+
+                if "post_processors" in current_config:
+                    config_data["post_processors"].extend(
+                        current_config["post_processors"]
+                    )
+        except Exception as e:
+            err_console.print(
+                f"[red]Error reading config file {config_path}: {e}[/red]"
+            )
+            raise typer.Exit(1) from e
+
+    return config_data
+
+
+def _load_serializer_files(serializer_paths: list[Path]) -> dict[str, Any]:
+    serializers: dict[str, Any] = {}
+
+    for serializers_path in serializer_paths:
+        if serializers_path.exists():
+            try:
+                with open(serializers_path, "rb") as f:
+                    serializers_data = tomllib.load(f)
+                    serializers.update(serializers_data.get("serializers", {}))
+            except Exception as e:
+                err_console.print(
+                    f"[yellow]Warning: Failed to load serializers file "
+                    f"{serializers_path}: {e}[/yellow]"
+                )
+
+    return serializers
+
+
 def _process_api(api, all_serializers, err_console):
     if "name" not in api:
         err_console.print("[red]Error: Each API must have a 'name' field[/red]")
@@ -75,8 +129,11 @@ def _process_api(api, all_serializers, err_console):
 
 @app.command("gen-config")
 def generate_from_config_cmd(
-    config: Path = typer.Option(
-        ..., "-c", "--config", help="Path to TOML configuration file"
+    config: list[Path] = typer.Option(
+        ...,
+        "-c",
+        "--config",
+        help="Path to TOML configuration file (can be specified multiple times)",
     ),
     output: Path = typer.Option(
         None,
@@ -85,16 +142,7 @@ def generate_from_config_cmd(
         help="Output file path (prints to stdout if not specified)",
     ),
 ) -> None:
-    if not config.exists():
-        err_console.print(f"[red]Error: Config file not found: {config}[/red]")
-        raise typer.Exit(1)
-
-    try:
-        with open(config, "rb") as f:
-            config_data = tomllib.load(f)
-    except Exception as e:
-        err_console.print(f"[red]Error reading config file: {e}[/red]")
-        raise typer.Exit(1) from e
+    config_data = _load_config_files(config)
 
     if "apis" not in config_data or not config_data["apis"]:
         err_console.print("[red]Error: No 'apis' section found in config file[/red]")
@@ -187,11 +235,18 @@ def generate_from_config_cmd(
 
 @app.command("run", help="Run API fetcher with config file")
 def main(
-    config: Path = typer.Option(
-        None, "-c", "--config", help="Path to TOML configuration file"
+    config: list[Path] = typer.Option(
+        None,
+        "-c",
+        "--config",
+        help="Path to TOML configuration file (can be specified multiple times)",
     ),
-    serializers: Path = typer.Option(
-        None, "-s", "--serializers", help="Path to serializers TOML configuration file"
+    serializers: list[Path] = typer.Option(
+        None,
+        "-s",
+        "--serializers",
+        help="Path to serializers TOML configuration file "
+        "(can be specified multiple times)",
     ),
     json_output: bool = typer.Option(False, "--json", help="Output as JSON format"),
 ) -> None:
@@ -213,16 +268,7 @@ def main(
             )
             raise typer.Exit(1)
 
-        if not config.exists():
-            err_console.print(f"[red]Error: Config file not found: {config}[/red]")
-            raise typer.Exit(1)
-
-        try:
-            with open(config, "rb") as f:
-                config_data = tomllib.load(f)
-        except Exception as e:
-            err_console.print(f"[red]Error reading config file: {e}[/red]")
-            raise typer.Exit(1) from e
+        config_data = _load_config_files(config)
 
     if "apis" not in config_data or not config_data["apis"]:
         err_console.print("[red]Error: No 'apis' section found in config file[/red]")
@@ -231,16 +277,10 @@ def main(
     apis = config_data["apis"]
     global_serializers = config_data.get("serializers", {})
 
-    if serializers and serializers.exists():
-        try:
-            with open(serializers, "rb") as f:
-                serializers_data = tomllib.load(f)
-                global_serializers.update(serializers_data.get("serializers", {}))
-        except Exception as e:
-            err_console.print(
-                f"[yellow]Warning: Failed to load serializers file: {e}[/yellow]"
-            )
+    if serializers:
+        global_serializers.update(_load_serializer_files(serializers))
 
+    shared_clients: dict[str, Any] = {}
     results = {}
     for api in apis:
         if "name" not in api:
@@ -248,7 +288,7 @@ def main(
             raise typer.Exit(1)
 
         name = api["name"]
-        results[name] = fetch_api_data(api, global_serializers)
+        results[name] = fetch_api_data(api, global_serializers, shared_clients)
 
     post_processors = config_data.get("post_processors", [])
     for post_processor in post_processors:

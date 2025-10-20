@@ -237,3 +237,108 @@ inputs = ["api1"]
     result = runner.invoke(app, ["run", "-c", str(config_file)])
     assert result.exit_code == 1
     assert "must have a 'name' field" in result.output
+
+
+def test_cli_with_multiple_config_files(tmp_path, monkeypatch):
+    from unittest.mock import Mock
+
+    mock_fetch = Mock(return_value={"data": "test"})
+    monkeypatch.setattr("apiout.cli.fetch_api_data", mock_fetch)
+
+    config_file1 = tmp_path / "config1.toml"
+    config_file1.write_text(
+        """
+[[apis]]
+name = "api1"
+module = "mod1"
+method = "meth1"
+"""
+    )
+
+    config_file2 = tmp_path / "config2.toml"
+    config_file2.write_text(
+        """
+[[apis]]
+name = "api2"
+module = "mod2"
+method = "meth2"
+"""
+    )
+
+    result = runner.invoke(
+        app,
+        ["run", "-c", str(config_file1), "-c", str(config_file2), "--json"],
+    )
+    assert result.exit_code == 0
+
+    output = json.loads(result.stdout)
+    assert "api1" in output
+    assert "api2" in output
+    assert mock_fetch.call_count == 2
+
+
+def test_cli_with_multiple_config_and_serializer_files(tmp_path, monkeypatch):
+    from unittest.mock import Mock
+
+    mock_fetch = Mock(return_value={"data": "test"})
+    monkeypatch.setattr("apiout.cli.fetch_api_data", mock_fetch)
+
+    config_file1 = tmp_path / "config1.toml"
+    config_file1.write_text(
+        """
+[[apis]]
+name = "api1"
+module = "mod1"
+method = "meth1"
+serializer = "ser1"
+"""
+    )
+
+    config_file2 = tmp_path / "config2.toml"
+    config_file2.write_text(
+        """
+[serializers.ser2]
+[serializers.ser2.fields]
+field2 = "Value2"
+
+[[apis]]
+name = "api2"
+module = "mod2"
+method = "meth2"
+serializer = "ser2"
+"""
+    )
+
+    serializers_file = tmp_path / "serializers.toml"
+    serializers_file.write_text(
+        """
+[serializers.ser1]
+[serializers.ser1.fields]
+field1 = "Value1"
+"""
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            "-c",
+            str(config_file1),
+            "-c",
+            str(config_file2),
+            "-s",
+            str(serializers_file),
+            "--json",
+        ],
+    )
+    assert result.exit_code == 0
+
+    output = json.loads(result.stdout)
+    assert "api1" in output
+    assert "api2" in output
+    assert mock_fetch.call_count == 2
+
+    calls = mock_fetch.call_args_list
+    serializers_arg = calls[0][0][1]
+    assert "ser1" in serializers_arg
+    assert "ser2" in serializers_arg
