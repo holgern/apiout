@@ -21,9 +21,21 @@
     },
     "serializers": {
       "type": "object",
-      "description": "Named serializer configurations for transforming API responses",
+      "description": "Named serializer configurations for transforming API responses. Supports both global serializers (top-level) and client-scoped serializers (nested under client names)",
       "additionalProperties": {
-        "$ref": "#/definitions/serializer"
+        "oneOf": [
+          {
+            "$ref": "#/definitions/serializer",
+            "description": "Global serializer (not scoped to a specific client)"
+          },
+          {
+            "type": "object",
+            "description": "Client-scoped serializers (nested under client name)",
+            "additionalProperties": {
+              "$ref": "#/definitions/serializer"
+            }
+          }
+        ]
       }
     },
     "post_processors": {
@@ -103,11 +115,11 @@
           "additionalProperties": true
         },
         "serializer": {
-          "description": "Reference to a serializer configuration (string) or inline serializer (object)",
+          "description": "Reference to a serializer configuration (string) or inline serializer (object). String can be a simple name (resolved with client scope if 'client' is specified, or globally), a dotted reference (e.g., 'client_name.serializer_name'), or an inline object.",
           "oneOf": [
             {
               "type": "string",
-              "description": "Name of a serializer defined in the serializers section"
+              "description": "Name of a serializer. Resolution order: 1) Inline dict (if object), 2) Explicit dotted reference (e.g., 'client.serializer'), 3) Client-scoped (if 'client' is specified), 4) Global serializer"
             },
             {
               "$ref": "#/definitions/serializer",
@@ -214,7 +226,7 @@
           "minItems": 1
         },
         "serializer": {
-          "description": "Reference to a serializer configuration (string) or inline serializer (object)",
+          "description": "Reference to a serializer configuration (string) or inline serializer (object). String can be a simple name (resolved globally), a dotted reference (e.g., 'client_name.serializer_name'), or an inline object.",
           "oneOf": [
             {
               "type": "string",

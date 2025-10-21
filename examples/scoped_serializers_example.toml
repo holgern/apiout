@@ -1,0 +1,84 @@
+# Example: Client-scoped serializers to avoid namespace collisions
+
+# Define reusable clients
+[clients.btc_price]
+module = "requests"
+client_class = "Session"
+
+[clients.mempool]
+module = "pymempool"
+client_class = "MempoolAPI"
+
+# Global serializers (backward compatible)
+[serializers.generic_data]
+[serializers.generic_data.fields]
+value = "data"
+timestamp = "created_at"
+
+# Client-scoped serializers - nested under client names
+# These avoid collisions when multiple clients need similarly-named serializers
+[serializers.btc_price.price_data]
+[serializers.btc_price.price_data.fields]
+usd = "usd_price"
+eur = "eur_price"
+timestamp = "last_update"
+
+[serializers.btc_price.volume]
+[serializers.btc_price.volume.fields]
+total = "total_volume"
+change_24h = "volume_change_24h"
+
+[serializers.mempool.block_data]
+[serializers.mempool.block_data.fields]
+hash = "block_hash"
+height = "block_height"
+timestamp = "block_time"
+
+[serializers.mempool.fee_data]
+[serializers.mempool.fee_data.fields]
+fastest = "fastest_fee"
+half_hour = "half_hour_fee"
+hour = "hour_fee"
+
+# APIs using client-scoped serializers
+[[apis]]
+name = "btc_price"
+client = "btc_price"
+method = "get"
+url = "https://api.coingecko.com/api/v3/simple/price"
+serializer = "price_data"  # Automatically resolved to btc_price.price_data
+
+[apis.params]
+ids = "bitcoin"
+vs_currencies = "usd,eur"
+include_24hr_vol = true
+
+[[apis]]
+name = "mempool_blocks"
+client = "mempool"
+method = "get_mempool_blocks"
+url = "https://mempool.space/api/"
+serializer = "block_data"  # Automatically resolved to mempool.block_data
+
+[[apis]]
+name = "mempool_fees"
+client = "mempool"
+method = "get_recommended_fees"
+url = "https://mempool.space/api/"
+serializer = "fee_data"  # Automatically resolved to mempool.fee_data
+
+# You can also use explicit dotted references
+[[apis]]
+name = "explicit_example"
+client = "btc_price"
+method = "get"
+url = "https://api.example.com/data"
+serializer = "mempool.block_data"  # Explicit reference to mempool's serializer
+
+# Global serializers still work
+[[apis]]
+name = "generic_api"
+module = "requests"
+method = "get"
+url = "https://api.example.com/generic"
+serializer = "generic_data"  # Uses global serializer

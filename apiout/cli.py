@@ -43,6 +43,48 @@ def generate_cmd(
     console.print(result)
 
 
+def _flatten_serializers(serializers: dict[str, Any]) -> dict[str, Any]:
+    """
+    Flatten nested serializer structure to support client-scoped namespaces.
+
+    Converts nested structure like:
+        {
+            "generic": {"fields": ...},
+            "btc_price": {
+                "price_data": {"fields": ...},
+                "other": {"fields": ...}
+            }
+        }
+
+    Into flat structure with dotted keys:
+        {
+            "generic": {"fields": ...},
+            "btc_price.price_data": {"fields": ...},
+            "btc_price.other": {"fields": ...}
+        }
+
+    Args:
+        serializers: Dict of serializer configurations (potentially nested)
+
+    Returns:
+        Flattened dict with dotted keys for nested serializers
+    """
+    flat = {}
+    for key, value in serializers.items():
+        if isinstance(value, dict) and "fields" in value:
+            # Top-level serializer (global) - no nesting
+            flat[key] = value
+        elif isinstance(value, dict):
+            # Nested serializers (client-scoped)
+            for nested_key, nested_value in value.items():
+                if isinstance(nested_value, dict):
+                    flat[f"{key}.{nested_key}"] = nested_value
+        else:
+            # Unexpected format - keep as-is
+            flat[key] = value
+    return flat
+
+
 def _load_config_files(config_paths: list[Path]) -> dict[str, Any]:
     config_data: dict[str, Any] = {
         "apis": [],
@@ -64,7 +106,8 @@ def _load_config_files(config_paths: list[Path]) -> dict[str, Any]:
                     config_data["apis"].extend(current_config["apis"])
 
                 if "serializers" in current_config:
-                    config_data["serializers"].update(current_config["serializers"])
+                    flattened = _flatten_serializers(current_config["serializers"])
+                    config_data["serializers"].update(flattened)
 
                 if "post_processors" in current_config:
                     config_data["post_processors"].extend(
@@ -90,7 +133,10 @@ def _load_serializer_files(serializer_paths: list[Path]) -> dict[str, Any]:
             try:
                 with open(serializers_path, "rb") as f:
                     serializers_data = tomllib.load(f)
-                    serializers.update(serializers_data.get("serializers", {}))
+                    flattened = _flatten_serializers(
+                        serializers_data.get("serializers", {})
+                    )
+                    serializers.update(flattened)
             except Exception as e:
                 err_console.print(
                     f"[yellow]Warning: Failed to load serializers file "

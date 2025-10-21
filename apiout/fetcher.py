@@ -20,35 +20,71 @@ from .serializer import serialize_response
 
 
 def resolve_serializer(
-    api_config: dict[str, Any], global_serializers: Optional[dict[str, Any]] = None
+    api_config: dict[str, Any],
+    global_serializers: Optional[dict[str, Any]] = None,
+    client_ref: Optional[str] = None,
 ) -> dict[str, Any]:
     """
-    Resolve serializer configuration from API config.
+    Resolve serializer configuration from API config with
+    client-scoped namespace support.
 
-    Looks up serializer configuration either from a string reference to global
-    serializers or from an inline dict definition.
+    Resolution order:
+    1. Inline dict (api_config["serializer"] is dict) - highest priority
+    2. Explicit dotted reference (e.g., "client.serializer_name")
+    3. Client-scoped lookup (e.g., serializers.{client_ref}.{name})
+    4. Global lookup (e.g., serializers.{name})
+    5. Empty dict (no serializer found)
 
     Args:
         api_config: API configuration dict containing optional 'serializer' key
         global_serializers: Optional dict of named serializer configurations
+        client_ref: Optional client reference name for scoped serializer lookup
 
     Returns:
         Resolved serializer configuration dict, or empty dict if none found
 
-    Example:
+    Examples:
+        >>> # Global serializer
         >>> api_config = {"serializer": "my_serializer"}
         >>> global_serializers = {"my_serializer": {"fields": {"name": "name"}}}
         >>> resolve_serializer(api_config, global_serializers)
         {'fields': {'name': 'name'}}
+
+        >>> # Client-scoped serializer
+        >>> api_config = {"serializer": "data", "client": "btc_price"}
+        >>> global_serializers = {"btc_price.data": {"fields": {"value": "usd"}}}
+        >>> resolve_serializer(api_config, global_serializers, client_ref="btc_price")
+        {'fields': {'value': 'usd'}}
+
+        >>> # Explicit dotted reference
+        >>> api_config = {"serializer": "btc_price.data"}
+        >>> global_serializers = {"btc_price.data": {"fields": {"value": "usd"}}}
+        >>> resolve_serializer(api_config, global_serializers)
+        {'fields': {'value': 'usd'}}
     """
     serializer_config: Any = api_config.get("serializer", {})
 
-    if isinstance(serializer_config, str) and global_serializers:
-        return global_serializers.get(serializer_config, {})
-
+    # 1. Inline dict - highest priority
     if isinstance(serializer_config, dict):
         return serializer_config
-    return {}
+
+    if not isinstance(serializer_config, str) or not global_serializers:
+        return {}
+
+    serializer_name = serializer_config
+
+    # 2. Explicit dotted reference (e.g., "btc_price.price_data")
+    if "." in serializer_name:
+        return global_serializers.get(serializer_name, {})
+
+    # 3. Client-scoped lookup
+    if client_ref:
+        client_scoped_name = f"{client_ref}.{serializer_name}"
+        if client_scoped_name in global_serializers:
+            return global_serializers[client_scoped_name]
+
+    # 4. Global lookup (existing behavior - fallback)
+    return global_serializers.get(serializer_name, {})
 
 
 def fetch_api_data(
@@ -154,7 +190,9 @@ def fetch_api_data(
         else:
             responses = method()
 
-        serializer_config = resolve_serializer(api_config, global_serializers)
+        serializer_config = resolve_serializer(
+            api_config, global_serializers, client_ref=client_ref
+        )
         return serialize_response(responses, serializer_config)
 
     except ImportError as e:

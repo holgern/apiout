@@ -234,6 +234,62 @@ iterate = {
 
 ## Advanced Serializer Features
 
+### Client-Scoped Serializers
+
+When working with multiple clients, you can scope serializers to specific clients to
+avoid namespace collisions:
+
+```toml
+# Define clients
+[clients.btc_price]
+module = "requests"
+client_class = "Session"
+
+[clients.mempool]
+module = "pymempool"
+client_class = "MempoolAPI"
+
+# Global serializers (backward compatible)
+[serializers.generic_data]
+[serializers.generic_data.fields]
+value = "data"
+
+# Client-scoped serializers - nested under client names
+[serializers.btc_price.price_data]
+[serializers.btc_price.price_data.fields]
+usd = "usd_price"
+eur = "eur_price"
+
+[serializers.mempool.price_data]
+[serializers.mempool.price_data.fields]
+sats_per_dollar = "price"
+timestamp = "time"
+
+# APIs automatically resolve serializers in client scope
+[[apis]]
+name = "btc_price"
+client = "btc_price"
+method = "get"
+url = "https://api.example.com"
+serializer = "price_data"  # Resolves to btc_price.price_data
+
+[[apis]]
+name = "mempool_price"
+client = "mempool"
+method = "get_price"
+url = "https://mempool.space/api/"
+serializer = "price_data"  # Resolves to mempool.price_data
+```
+
+**Resolution Order:**
+
+1. Inline dict (highest priority)
+2. Explicit dotted reference (e.g., `"client_name.serializer"`)
+3. Client-scoped lookup (e.g., when API has `client = "foo"` and `serializer = "bar"`)
+4. Global lookup (backward compatible)
+
+See `examples/scoped_serializers_example.toml` for a complete example.
+
 ### Method Calls
 
 Call methods on objects:
