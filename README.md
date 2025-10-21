@@ -116,20 +116,98 @@ Run with just the API config:
 apiout run -c apis.toml --json
 ```
 
+### 4. Environment Files
+
+For cleaner configuration management, you can store reusable API configurations in 
+`~/.config/apiout/` and load them with the `-e`/`--env` flag:
+
+**Setup:**
+
+Create environment files in `~/.config/apiout/`:
+
+```bash
+# ~/.config/apiout/mempool.toml
+[clients.mempool]
+module = "requests"
+client_class = "Session"
+
+[serializers.mempool.block_data]
+[serializers.mempool.block_data.fields]
+hash = "id"
+height = "height"
+timestamp = "timestamp"
+
+[[apis]]
+name = "mempool_blocks"
+client = "mempool"
+method = "get"
+url = "https://mempool.space/api/v1/blocks"
+serializer = "block_data"
+```
+
+```bash
+# ~/.config/apiout/btcprice.toml
+[clients.btc_price]
+module = "requests"
+client_class = "Session"
+
+[serializers.btc_price.price_data]
+[serializers.btc_price.price_data.fields]
+usd = "bitcoin.usd"
+eur = "bitcoin.eur"
+
+[[apis]]
+name = "btc_price"
+client = "btc_price"
+method = "get"
+url = "https://api.coingecko.com/api/v3/simple/price"
+serializer = "price_data"
+```
+
+**Usage:**
+
+```bash
+# Load single environment
+apiout run -e mempool --json
+
+# Load multiple environments
+apiout run -e mempool -e btcprice --json
+
+# Mix environments with explicit configs
+apiout run -e mempool -c custom.toml --json
+```
+
+**XDG Base Directory Support:**
+
+The tool follows the XDG Base Directory specification:
+- Uses `$XDG_CONFIG_HOME/apiout/` if set
+- Falls back to `~/.config/apiout/` otherwise
+
+See `examples/env_mempool.toml` and `examples/env_btcprice.toml` for complete examples.
+
 ## CLI Commands
 
 ### `run` - Fetch API Data
 
 ```bash
+# Using environment files
+apiout run -e <env_name> [--json]
+
+# Using config files
 apiout run -c <config.toml> [-s <serializers.toml>] [--json]
+
+# Mix environments and config files
+apiout run -e <env1> -e <env2> -c <config.toml> [--json]
+
 # OR pipe JSON configuration from stdin
 <json-source> | apiout run [--json]
 ```
 
 **Options:**
 
-- `-c, --config`: Path to API configuration file (TOML format)
-- `-s, --serializers`: Path to serializers configuration file (optional)
+- `-e, --env`: Environment name to load from `~/.config/apiout/` (can be specified multiple times)
+- `-c, --config`: Path to API configuration file (TOML format, can be specified multiple times)
+- `-s, --serializers`: Path to serializers configuration file (optional, can be specified multiple times)
 - `--json`: Output as JSON format (default: pretty-printed)
 
 **Using JSON Input from stdin:**

@@ -5,9 +5,9 @@ def test_resolve_serializer_inline_dict():
     """Test that inline dict has highest priority"""
     api_config = {"serializer": {"fields": {"inline": "value"}}}
     global_serializers = {"generic": {"fields": {"global": "value"}}}
-    
+
     result = resolve_serializer(api_config, global_serializers)
-    
+
     assert result == {"fields": {"inline": "value"}}
 
 
@@ -18,9 +18,9 @@ def test_resolve_serializer_explicit_dotted_reference():
         "btc_price.price_data": {"fields": {"usd": "usd_price"}},
         "price_data": {"fields": {"wrong": "field"}},
     }
-    
+
     result = resolve_serializer(api_config, global_serializers)
-    
+
     assert result == {"fields": {"usd": "usd_price"}}
 
 
@@ -31,9 +31,9 @@ def test_resolve_serializer_client_scoped_lookup():
         "btc_price.price_data": {"fields": {"usd": "usd_price"}},
         "price_data": {"fields": {"generic": "field"}},
     }
-    
+
     result = resolve_serializer(api_config, global_serializers, client_ref="btc_price")
-    
+
     assert result == {"fields": {"usd": "usd_price"}}
 
 
@@ -43,9 +43,9 @@ def test_resolve_serializer_global_fallback():
     global_serializers = {
         "price_data": {"fields": {"generic": "field"}},
     }
-    
+
     result = resolve_serializer(api_config, global_serializers, client_ref="btc_price")
-    
+
     assert result == {"fields": {"generic": "field"}}
 
 
@@ -53,9 +53,11 @@ def test_resolve_serializer_empty_when_not_found():
     """Test that empty dict is returned when serializer not found"""
     api_config = {"serializer": "nonexistent", "client": "some_client"}
     global_serializers = {}
-    
-    result = resolve_serializer(api_config, global_serializers, client_ref="some_client")
-    
+
+    result = resolve_serializer(
+        api_config, global_serializers, client_ref="some_client"
+    )
+
     assert result == {}
 
 
@@ -67,10 +69,10 @@ def test_resolve_serializer_priority_order():
         "test.my_ser": {"fields": {"scoped": "loses"}},
         "my_ser": {"fields": {"global": "loses"}},
     }
-    
+
     result = resolve_serializer(api_config, global_serializers, client_ref="test")
     assert result == {"fields": {"inline": "wins"}}
-    
+
     # Test that dotted beats scoped
     api_config = {"serializer": "other.my_ser", "client": "test"}
     global_serializers = {
@@ -78,17 +80,17 @@ def test_resolve_serializer_priority_order():
         "test.my_ser": {"fields": {"scoped": "loses"}},
         "my_ser": {"fields": {"global": "loses"}},
     }
-    
+
     result = resolve_serializer(api_config, global_serializers, client_ref="test")
     assert result == {"fields": {"dotted": "wins"}}
-    
+
     # Test that scoped beats global
     api_config = {"serializer": "my_ser", "client": "test"}
     global_serializers = {
         "test.my_ser": {"fields": {"scoped": "wins"}},
         "my_ser": {"fields": {"global": "loses"}},
     }
-    
+
     result = resolve_serializer(api_config, global_serializers, client_ref="test")
     assert result == {"fields": {"scoped": "wins"}}
 
@@ -99,9 +101,9 @@ def test_resolve_serializer_no_client_ref():
     global_serializers = {
         "generic": {"fields": {"value": "data"}},
     }
-    
+
     result = resolve_serializer(api_config, global_serializers)
-    
+
     assert result == {"fields": {"value": "data"}}
 
 
@@ -109,7 +111,7 @@ def test_resolve_serializer_no_serializer_in_config():
     """Test that empty dict is returned when no serializer in config"""
     api_config = {}
     global_serializers = {"generic": {"fields": {"value": "data"}}}
-    
+
     result = resolve_serializer(api_config, global_serializers, client_ref="test")
-    
+
     assert result == {}

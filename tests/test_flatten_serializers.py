@@ -7,9 +7,9 @@ def test_flatten_serializers_global_only():
         "generic": {"fields": {"value": "data"}},
         "another": {"fields": {"key": "val"}},
     }
-    
+
     result = _flatten_serializers(serializers)
-    
+
     assert result == {
         "generic": {"fields": {"value": "data"}},
         "another": {"fields": {"key": "val"}},
@@ -24,9 +24,9 @@ def test_flatten_serializers_nested_only():
             "other": {"fields": {"value": "data"}},
         },
     }
-    
+
     result = _flatten_serializers(serializers)
-    
+
     assert result == {
         "btc_price.price_data": {"fields": {"usd": "usd_price"}},
         "btc_price.other": {"fields": {"value": "data"}},
@@ -46,9 +46,9 @@ def test_flatten_serializers_mixed():
         },
         "another_global": {"fields": {"key": "val"}},
     }
-    
+
     result = _flatten_serializers(serializers)
-    
+
     assert result == {
         "generic": {"fields": {"value": "data"}},
         "btc_price.price_data": {"fields": {"usd": "usd_price"}},
@@ -61,9 +61,9 @@ def test_flatten_serializers_mixed():
 def test_flatten_serializers_empty():
     """Test that empty dict returns empty dict"""
     serializers = {}
-    
+
     result = _flatten_serializers(serializers)
-    
+
     assert result == {}
 
 
@@ -74,9 +74,9 @@ def test_flatten_serializers_unexpected_format():
         "string_value": "unexpected",
         "number_value": 42,
     }
-    
+
     result = _flatten_serializers(serializers)
-    
+
     assert result == {
         "normal": {"fields": {"value": "data"}},
         "string_value": "unexpected",

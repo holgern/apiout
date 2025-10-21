@@ -1,4 +1,5 @@
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -17,6 +18,48 @@ else:
 app = typer.Typer()
 console = Console()
 err_console = Console(stderr=True)
+
+
+def _get_config_dir() -> Path:
+    """
+    Get the apiout configuration directory following XDG Base Directory spec.
+
+    Returns:
+        Path to ~/.config/apiout/ (or $XDG_CONFIG_HOME/apiout/)
+    """
+    xdg_config_home = os.environ.get("XDG_CONFIG_HOME")
+    if xdg_config_home:
+        config_dir = Path(xdg_config_home).expanduser() / "apiout"
+    else:
+        config_dir = Path.home() / ".config" / "apiout"
+
+    return config_dir
+
+
+def _load_env_file(env_name: str) -> Path:
+    """
+    Load an environment file from ~/.config/apiout/
+
+    Args:
+        env_name: Name of the environment (e.g., "mempool", "btcprice")
+
+    Returns:
+        Path to the environment TOML file
+
+    Raises:
+        typer.Exit if the environment file doesn't exist
+    """
+    config_dir = _get_config_dir()
+    env_file = config_dir / f"{env_name}.toml"
+
+    if not env_file.exists():
+        err_console.print(
+            f"[red]Error: Environment file not found: {env_file}[/red]\n"
+            f"[yellow]Hint: Create environment files in {config_dir}/[/yellow]"
+        )
+        raise typer.Exit(1)
+
+    return env_file
 
 
 @app.command("generate")
@@ -308,6 +351,13 @@ def generate_from_config_cmd(
 
 @app.command("run", help="Run API fetcher with config file")
 def main(
+    env: list[str] = typer.Option(
+        None,
+        "-e",
+        "--env",
+        help="Environment name to load from ~/.config/apiout/ "
+        "(can be specified multiple times)",
+    ),
     config: list[Path] = typer.Option(
         None,
         "-c",
@@ -326,7 +376,7 @@ def main(
     # Auto-detect JSON input from stdin
     has_stdin = not sys.stdin.isatty()
 
-    if has_stdin and not config:
+    if has_stdin and not config and not env:
         # Read from stdin as JSON
         try:
             stdin_data = sys.stdin.read()
@@ -335,13 +385,28 @@ def main(
             err_console.print(f"[red]Error: Invalid JSON from stdin: {e}[/red]")
             raise typer.Exit(1) from e
     else:
-        if not config:
+        # Build list of config files from environments and explicit configs
+        all_config_files: list[Path] = []
+
+        # Load environment files first
+        if env:
+            for env_name in env:
+                env_file = _load_env_file(env_name)
+                all_config_files.append(env_file)
+
+        # Add explicit config files
+        if config:
+            all_config_files.extend(config)
+
+        # Check if we have any config sources
+        if not all_config_files:
             err_console.print(
-                "[red]Error: --config must be provided (or pipe JSON to stdin)[/red]"
+                "[red]Error: At least one of --env, --config must be provided "
+                "(or pipe JSON to stdin)[/red]"
             )
             raise typer.Exit(1)
 
-        config_data = _load_config_files(config)
+        config_data = _load_config_files(all_config_files)
 
     if "apis" not in config_data or not config_data["apis"]:
         err_console.print("[red]Error: No 'apis' section found in config file[/red]")
