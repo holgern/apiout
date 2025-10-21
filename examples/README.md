@@ -33,8 +33,8 @@ apiout run -c examples/apis.toml -s examples/serializers.toml --json
 
 This example shows how to:
 
-1. Share a single client instance across multiple API calls using `client_id`
-2. Initialize the client once with `init_method` and `init_params`
+1. Define a reusable client configuration with `init_method` and `init_params`
+2. Share the client instance across multiple API calls by referencing it
 3. Call multiple methods on the same instance without re-fetching data
 4. Use the simplified `ApiClient` class for easy programmatic access
 
@@ -89,15 +89,19 @@ successful = client.get_successful_results()
 
 ### How It Works
 
-1. **First API** (`btc_price_usd`):
+1. **Client Definition**: The `[clients.btc_price]` section defines the reusable client:
 
    - Creates `Price` instance with
      `init_params = {fiat = "EUR", days_ago = 1, service = "coinpaprika"}`
-   - Calls `update_service()` method once to fetch price data
-   - Calls `get_usd_price()` and stores the instance with `client_id = "btc_price"`
+   - Calls `init_method = "update_service"` once to fetch price data
 
-2. **Subsequent APIs** (all others):
-   - Reuse the same `Price` instance via `client_id = "btc_price"`
+2. **First API** (`btc_price_usd`):
+
+   - References `client = "btc_price"`
+   - Calls `get_usd_price()` on the shared instance
+
+3. **Subsequent APIs**:
+   - All reference the same `client = "btc_price"`
    - No re-initialization or re-fetching
    - Simply call their respective methods on the cached data
 
@@ -106,16 +110,20 @@ successful = client.get_successful_results()
 The key features used:
 
 ```toml
+[clients.btc_price]
+module = "btcpriceticker"
+client_class = "Price"
+init_params = {fiat = "EUR", days_ago = 1, service = "coinpaprika"}
+init_method = "update_service"
+
 [[apis]]
 name = "btc_price_usd"
-client_id = "btc_price"           # Identifies shared instance
-init_method = "update_service"    # Called once after instantiation
-init_params = {fiat = "EUR", days_ago = 1, service = "coinpaprika"}
+client = "btc_price"
 method = "get_usd_price"
 
 [[apis]]
 name = "btc_price_eur"
-client_id = "btc_price"           # Reuses the same instance
+client = "btc_price"
 method = "get_fiat_price"
 ```
 

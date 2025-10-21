@@ -142,29 +142,35 @@ def test_fetch_api_data_with_shared_client(mock_import):
     mock_import.return_value = mock_module
 
     shared_clients = {}
+    client_configs = {
+        "shared_client": {
+            "module": "test_module",
+            "client_class": "Client",
+            "init_method": "init_method",
+            "init_params": {"param": "value"},
+        }
+    }
 
     config1 = {
-        "module": "test_module",
-        "client_class": "Client",
-        "client_id": "shared_client",
-        "init_method": "init_method",
-        "init_params": {"param": "value"},
+        "client": "shared_client",
         "method": "method1",
     }
 
-    result1 = fetch_api_data(config1, shared_clients=shared_clients)
+    result1 = fetch_api_data(
+        config1, shared_clients=shared_clients, client_configs=client_configs
+    )
     assert result1 == "result1"
     mock_module.Client.assert_called_once_with(param="value")
     mock_client.init_method.assert_called_once()
 
     config2 = {
-        "module": "test_module",
-        "client_class": "Client",
-        "client_id": "shared_client",
+        "client": "shared_client",
         "method": "method2",
     }
 
-    result2 = fetch_api_data(config2, shared_clients=shared_clients)
+    result2 = fetch_api_data(
+        config2, shared_clients=shared_clients, client_configs=client_configs
+    )
     assert result2 == "result2"
     assert mock_module.Client.call_count == 1
     assert mock_client.init_method.call_count == 1
@@ -180,15 +186,21 @@ def test_fetch_api_data_shared_client_without_init(mock_import):
     mock_import.return_value = mock_module
 
     shared_clients = {}
+    client_configs = {
+        "shared_client": {
+            "module": "test_module",
+            "client_class": "Client",
+        }
+    }
 
     config = {
-        "module": "test_module",
-        "client_class": "Client",
-        "client_id": "shared_client",
+        "client": "shared_client",
         "method": "method",
     }
 
-    result = fetch_api_data(config, shared_clients=shared_clients)
+    result = fetch_api_data(
+        config, shared_clients=shared_clients, client_configs=client_configs
+    )
     assert result == "result"
     mock_module.Client.assert_called_once_with()
     assert "shared_client" in shared_clients

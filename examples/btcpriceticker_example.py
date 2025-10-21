@@ -21,7 +21,7 @@ def main():
     client = ApiClient(config_path)
 
     print(f"Loaded {len(client.apis)} API endpoints")
-    print(f"Using shared client with ID: {client.apis[0].get('client_id', 'none')}\n")
+    print(f"Using shared client: {client.apis[0].get('client', 'none')}\n")
 
     print("Fetching data (first run)...")
     start_time = time.time()

@@ -61,8 +61,8 @@ def fetch_api_data(
     Fetch data from an API endpoint based on configuration.
 
     Dynamically imports a module, instantiates or reuses a client class,
-    and calls the specified method. Supports shared client instances via
-    client_id to avoid redundant instantiation.
+    and calls the specified method. Supports shared client instances when
+    using client references.
 
     Args:
         api_config: API configuration dict with keys:
@@ -70,9 +70,7 @@ def fetch_api_data(
             - method: Method name to call on client (required)
             - client: Reference to a client config name (optional)
             - client_class: Class name to instantiate (default: "Client")
-            - client_id: ID for shared client instance (optional)
             - init_params: Params for client initialization (optional)
-            - init_method: Method to call after initialization (optional)
             - url: URL parameter to pass to method (optional)
             - params: Additional parameters for method (optional)
             - serializer: Serializer config or reference (optional)
@@ -107,14 +105,14 @@ def fetch_api_data(
             if not module_name:
                 module_name = client_config.get("module")
             client_class_name = client_config.get("client_class", "Client")
-            client_id = client_config.get("client_id", client_ref)
+            client_id = client_ref
             init_params = client_config.get("init_params", {})
             init_method_name = client_config.get("init_method")
         else:
             client_class_name = api_config.get("client_class", "Client")
-            client_id = api_config.get("client_id")
+            client_id = None
             init_params = api_config.get("init_params", {})
-            init_method_name = api_config.get("init_method")
+            init_method_name = None
 
         if not module_name:
             return {"error": "No module specified"}
@@ -257,7 +255,7 @@ class ApiClient:
     Supports:
     - Loading single or multiple TOML configuration files
     - Automatic merging of APIs, serializers, and post-processors
-    - Shared client instance management via client_id
+    - Shared client instance management via client references
     - Result caching with success/failure tracking
     - Timestamp tracking for each API call
 
@@ -267,7 +265,7 @@ class ApiClient:
         serializers: Dict of named serializer configurations
         post_processors: List of post-processor configurations
         clients: Dict of named client configurations
-        shared_clients: Dict of shared client instances by client_id
+        shared_clients: Dict of shared client instances by reference name
         results: Dict of API results by name (cached after fetch)
         status: Dict of status info by name (success, error, timestamp)
         last_fetch_time: Timestamp of the most recent fetch() call

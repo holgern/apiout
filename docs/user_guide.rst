@@ -41,9 +41,7 @@ Optional Fields
 * ``client_class``: Name of the client class (default: "Client")
 * ``serializer``: Reference to a serializer configuration (string) or inline serializer (dict)
 * ``params``: Dictionary of parameters to pass to the API method
-* ``client_id``: Identifier for sharing client instances across multiple API calls
 * ``init_params``: Parameters to pass to the client class constructor
-* ``init_method``: Method to call once after client instantiation
 * ``client``: Reference to a client configuration from the ``[clients]`` section
 
 Multiple APIs
@@ -216,6 +214,8 @@ Reusable Client Configurations
 
 When multiple APIs use the same client with identical initialization parameters, you can define the client once in a ``[clients]`` section and reference it from multiple APIs. This eliminates repetition and makes configurations easier to maintain.
 
+**Client references automatically create shared instances** - all APIs referencing the same client will share one instance.
+
 Configuration
 ^^^^^^^^^^^^^
 
@@ -241,6 +241,31 @@ Configuration
    client = "mempool"
    method = "get_recommended_fees"
 
+With Init Method
+^^^^^^^^^^^^^^^^
+
+For clients that require initialization before use, specify ``init_method`` in the client definition:
+
+.. code-block:: toml
+
+   [clients.btc_price]
+   module = "btcpriceticker"
+   client_class = "Price"
+   init_params = {fiat = "EUR", days_ago = 1, service = "coinpaprika"}
+   init_method = "update_service"
+
+   [[apis]]
+   name = "btc_price_usd"
+   client = "btc_price"
+   method = "get_usd_price"
+
+   [[apis]]
+   name = "btc_price_eur"
+   client = "btc_price"
+   method = "get_fiat_price"
+
+The ``init_method`` is called **once** when the client is first created. All subsequent APIs reuse the same instance without re-initialization.
+
 How It Works
 ^^^^^^^^^^^^
 
@@ -249,12 +274,17 @@ How It Works
    * ``module``: Python module containing the client class
    * ``client_class``: Name of the client class
    * ``init_params``: Parameters to pass to the constructor (optional)
+   * ``init_method``: Method to call once after instantiation (optional)
 
 2. Reference the client from APIs using ``client = "<name>"``
 
-3. Each API referencing the same client shares one instance
+3. The client is instantiated **once** when first referenced
 
-4. Only the ``method`` and ``params`` need to be specified for each API
+4. If ``init_method`` is specified, it's called after instantiation
+
+5. All APIs referencing the same client share this instance
+
+6. Only the ``method`` and ``params`` need to be specified for each API
 
 Benefits
 ^^^^^^^^
@@ -262,7 +292,8 @@ Benefits
 * **Eliminate Repetition**: Define client configuration once, reference it multiple times
 * **Easier Maintenance**: Update client settings in one place
 * **Cleaner Configs**: Focus on what each API does, not how to initialize the client
-* **Shared Instances**: All APIs using the same client reference share one instance
+* **Automatic Sharing**: All APIs using the same client reference share one instance
+* **Performance**: Avoid redundant initialization and data fetching
 
 Compatibility
 ^^^^^^^^^^^^^
@@ -283,71 +314,6 @@ Client definitions are merged from multiple configuration files:
    apiout run -c base.toml -c apis.toml
 
 If the same client name appears in multiple files, later files override earlier ones.
-
-Shared Client Instances
-~~~~~~~~~~~~~~~~~~~~~~~
-
-When you need to reuse the same client instance across multiple API calls (e.g., to avoid redundant initialization or data fetching), use shared client instances.
-
-Configuration
-^^^^^^^^^^^^^
-
-.. code-block:: toml
-
-   [[apis]]
-   name = "btc_price_eur"
-   module = "btcpriceticker"
-   client_class = "Price"
-   client_id = "btc_price"           # Identifies this shared instance
-   init_method = "update_service"    # Called once after instantiation
-   init_params = {fiat = "EUR"}      # Passed to constructor
-   method = "get_price_now"
-
-   [[apis]]
-   name = "btc_price_usd"
-   module = "btcpriceticker"
-   client_class = "Price"
-   client_id = "btc_price"           # Reuses the same instance
-   method = "get_usd_price"
-
-   [[apis]]
-   name = "btc_price_fiat"
-   module = "btcpriceticker"
-   client_class = "Price"
-   client_id = "btc_price"           # Reuses the same instance
-   method = "get_fiat_price"
-   fiat = "EUR"
-
-How It Works
-^^^^^^^^^^^^
-
-1. First API with ``client_id = "btc_price"``:
-
-   * Client is instantiated with ``init_params``
-   * If ``init_method`` is specified, it's called once
-   * Method is called and result is stored
-
-2. Subsequent APIs with the same ``client_id``:
-
-   * The existing client instance is reused
-   * No re-initialization occurs
-   * Only the specified method is called
-
-Benefits
-^^^^^^^^
-
-* **Performance**: Avoid redundant initialization or data fetching
-* **State Preservation**: Maintain state across multiple method calls
-* **Resource Efficiency**: Reduce memory and network overhead
-* **Consistency**: Ensure all methods operate on the same data
-
-Use Cases
-^^^^^^^^^
-
-* APIs that require expensive initialization
-* Services that fetch data once and provide multiple access methods
-* Clients with authentication that should be reused
-* Objects with cached data that multiple methods query
 
 Multiple Configuration Files
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

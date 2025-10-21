@@ -37,7 +37,7 @@
   "definitions": {
     "client": {
       "type": "object",
-      "description": "Reusable client configuration that can be referenced by multiple APIs",
+      "description": "Reusable client configuration that can be referenced by multiple APIs. All APIs referencing the same client automatically share one instance.",
       "required": ["module"],
       "properties": {
         "module": {
@@ -53,6 +53,10 @@
           "type": "object",
           "description": "Parameters to pass to the client class constructor",
           "additionalProperties": true
+        },
+        "init_method": {
+          "type": "string",
+          "description": "Method to call once after client instantiation. Called only when the client is first created."
         }
       },
       "additionalProperties": false
@@ -87,14 +91,6 @@
           "type": "string",
           "description": "API endpoint URL",
           "format": "uri"
-        },
-        "client_id": {
-          "type": "string",
-          "description": "Identifier for sharing client instances across multiple API calls"
-        },
-        "init_method": {
-          "type": "string",
-          "description": "Method to call once after client instantiation (requires client_id)"
         },
         "init_params": {
           "type": "object",

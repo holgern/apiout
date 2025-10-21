@@ -308,6 +308,7 @@ def main(
         global_serializers.update(_load_serializer_files(serializers))
 
     shared_clients: dict[str, Any] = {}
+    client_configs = config_data.get("clients", {})
     results = {}
     for api in apis:
         if "name" not in api:
@@ -315,7 +316,9 @@ def main(
             raise typer.Exit(1)
 
         name = api["name"]
-        results[name] = fetch_api_data(api, global_serializers, shared_clients)
+        results[name] = fetch_api_data(
+            api, global_serializers, shared_clients, client_configs
+        )
 
     post_processors = config_data.get("post_processors", [])
     for post_processor in post_processors:

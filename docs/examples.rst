@@ -354,45 +354,113 @@ With Custom Serializer
    result = fetch_api_data(api_config, serializers)
    print(result)
 
-Shared Client Instances Example
---------------------------------
+Reusable Client Configurations Example
+---------------------------------------
 
-Bitcoin Price Ticker
-~~~~~~~~~~~~~~~~~~~~
+Eliminating Configuration Repetition
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-When working with APIs that require initialization before calling multiple methods, use shared client instances:
+When multiple APIs use the same client, define it once and reference it multiple times.
 
-**Problem**: The ``btcpriceticker.Price`` class needs ``update_service()`` called once to fetch data, then multiple methods can query the same data.
+**Without Client References** (repetitive):
 
-**Solution**: Use ``client_id`` to share one instance across multiple API calls.
+.. code-block:: toml
+
+   [[apis]]
+   name = "block_tip_hash"
+   module = "pymempool"
+   client_class = "MempoolAPI"
+   init_params = {api_base_url = "https://mempool.space/api/"}
+   method = "get_block_tip_hash"
+
+   [[apis]]
+   name = "block_tip_height"
+   module = "pymempool"
+   client_class = "MempoolAPI"
+   init_params = {api_base_url = "https://mempool.space/api/"}
+   method = "get_block_tip_height"
+
+**With Client References** (clean and maintainable):
+
+``mempool_apis.toml``:
+
+.. code-block:: toml
+
+   [clients.mempool]
+   module = "pymempool"
+   client_class = "MempoolAPI"
+   init_params = {api_base_url = "https://mempool.space/api/"}
+
+   [[apis]]
+   name = "block_tip_hash"
+   client = "mempool"
+   method = "get_block_tip_hash"
+
+   [[apis]]
+   name = "block_tip_height"
+   client = "mempool"
+   method = "get_block_tip_height"
+
+   [[apis]]
+   name = "recommended_fees"
+   client = "mempool"
+   method = "get_recommended_fees"
+
+   [[apis]]
+   name = "difficulty_adjustment"
+   client = "mempool"
+   method = "get_difficulty_adjustment"
+
+**Running the Example**
+
+.. code-block:: bash
+
+   pip install pymempool
+   apiout run -c mempool_apis.toml --json
+
+**How It Works**
+
+1. The ``[clients.mempool]`` section defines the client configuration once
+2. Each API references ``client = "mempool"`` instead of repeating initialization
+3. All APIs share the same client instance automatically
+4. Changing the API URL only requires updating one line
+
+**Benefits**
+
+* Define client configuration once, use it many times
+* Update client settings in one place
+* Cleaner, more maintainable configurations
+* Automatic instance sharing across referenced APIs
+
+With Init Method
+~~~~~~~~~~~~~~~~
+
+For clients that require initialization, define ``init_method`` in the client configuration:
 
 ``btcpriceticker.toml``:
 
 .. code-block:: toml
 
-   [[apis]]
-   name = "btc_price_eur"
+   [clients.btc_price]
    module = "btcpriceticker"
    client_class = "Price"
-   client_id = "btc_price"
+   init_params = {fiat = "EUR", days_ago = 1, service = "coinpaprika"}
    init_method = "update_service"
-   init_params = {fiat = "EUR"}
-   method = "get_price_now"
 
    [[apis]]
    name = "btc_price_usd"
-   module = "btcpriceticker"
-   client_class = "Price"
-   client_id = "btc_price"
+   client = "btc_price"
    method = "get_usd_price"
 
    [[apis]]
-   name = "btc_price_eur_without_refresh"
-   module = "btcpriceticker"
-   client_class = "Price"
-   client_id = "btc_price"
+   name = "btc_price_eur"
+   client = "btc_price"
    method = "get_fiat_price"
-   fiat = "EUR"
+
+   [[apis]]
+   name = "btc_price_timestamp"
+   client = "btc_price"
+   method = "get_timestamp"
 
 **Running the Example**
 
@@ -403,45 +471,20 @@ When working with APIs that require initialization before calling multiple metho
 
 **How It Works**
 
-1. First API (``btc_price_eur``):
-
-   * ``Price`` is instantiated with ``fiat="EUR"``
-   * ``update_service()`` is called once to fetch price data
-   * ``get_price_now()`` is called
-   * Instance is stored with key ``"btc_price"``
-
-2. Second API (``btc_price_usd``):
-
-   * Reuses the existing ``Price`` instance
-   * No re-initialization or re-fetching
-   * Simply calls ``get_usd_price()`` on the same instance
-
-3. Third API (``btc_price_eur_without_refresh``):
-
-   * Reuses the same instance again
-   * Calls ``get_fiat_price("EUR")`` on the same data
+1. The client is defined once with ``init_method = "update_service"``
+2. When first referenced, the client is instantiated and ``update_service()`` is called
+3. All subsequent APIs reuse the same instance without re-initialization
+4. Data is fetched once, queried multiple times
 
 **Expected Output**
 
 .. code-block:: json
 
    {
-     "btc_price_eur": 89234.56,
-     "btc_price_usd": 94523.12,
-     "btc_price_eur_without_refresh": 89234.56
+     "btc_price_usd": 109315.67,
+     "btc_price_eur": 93970.49,
+     "btc_price_timestamp": 1761049894.21
    }
-
-**Key Configuration Options**
-
-* ``client_id``: Unique identifier for sharing instances (e.g., ``"btc_price"``)
-* ``init_method``: Method to call once after instantiation (e.g., ``"update_service"``)
-* ``init_params``: Parameters passed to the constructor (e.g., ``{fiat = "EUR"}``)
-
-**Benefits**
-
-* Single data fetch for multiple queries
-* Consistent data across all method calls
-* Improved performance by avoiding redundant operations
 
 Multiple Configuration Files Example
 -------------------------------------
@@ -622,7 +665,7 @@ When multiple APIs use the same client, define it once and reference it multiple
 
 1. The ``[clients.mempool]`` section defines the client configuration once
 2. Each API references ``client = "mempool"`` instead of repeating initialization
-3. All APIs share the same client instance
+3. All APIs share the same client instance automatically
 4. Changing the API URL only requires updating one line
 
 **Benefits**
@@ -632,13 +675,67 @@ When multiple APIs use the same client, define it once and reference it multiple
 * Cleaner, more maintainable configurations
 * Automatic instance sharing across referenced APIs
 
+With Init Method
+~~~~~~~~~~~~~~~~
+
+For clients that require initialization, define ``init_method`` in the client configuration:
+
+``btcpriceticker.toml``:
+
+.. code-block:: toml
+
+   [clients.btc_price]
+   module = "btcpriceticker"
+   client_class = "Price"
+   init_params = {fiat = "EUR", days_ago = 1, service = "coinpaprika"}
+   init_method = "update_service"
+
+   [[apis]]
+   name = "btc_price_usd"
+   client = "btc_price"
+   method = "get_usd_price"
+
+   [[apis]]
+   name = "btc_price_eur"
+   client = "btc_price"
+   method = "get_fiat_price"
+
+   [[apis]]
+   name = "btc_price_timestamp"
+   client = "btc_price"
+   method = "get_timestamp"
+
+**Running the Example**
+
+.. code-block:: bash
+
+   pip install btcpriceticker
+   apiout run -c btcpriceticker.toml --json
+
+**How It Works**
+
+1. The client is defined once with ``init_method = "update_service"``
+2. When first referenced, the client is instantiated and ``update_service()`` is called
+3. All subsequent APIs reuse the same instance without re-initialization
+4. Data is fetched once, queried multiple times
+
+**Expected Output**
+
+.. code-block:: json
+
+   {
+     "btc_price_usd": 109315.67,
+     "btc_price_eur": 93970.49,
+     "btc_price_timestamp": 1761049894.21
+   }
+
 Post-Processor Example
 ----------------------
 
 Combining Multiple API Results
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Post-processors allow you to combine and transform data from multiple API calls using any Python class.
+Post-processors allow you to combine and transform data from multiple API calls using any Python class. They can also use client references for cleaner configuration.
 
 **Configuration**
 
@@ -663,7 +760,7 @@ Post-processors allow you to combine and transform data from multiple API calls 
 
    [[post_processors]]
    name = "fee_analysis"
-   module = "pymempool"
+   client = "mempool"
    class = "RecommendedFees"
    inputs = ["recommended_fees", "mempool_blocks_fee"]
    serializer = "fee_analysis_serializer"
@@ -678,9 +775,10 @@ Post-processors allow you to combine and transform data from multiple API calls 
 **How It Works**
 
 1. Both APIs are fetched first: ``recommended_fees`` and ``mempool_blocks_fee``
-2. The post-processor instantiates ``pymempool.RecommendedFees`` with both results
-3. The output is serialized using ``fee_analysis_serializer``
-4. The result appears in the output under the name ``fee_analysis``
+2. The post-processor references ``client = "mempool"`` to use the ``pymempool`` module
+3. The ``RecommendedFees`` class is instantiated with both results
+4. The output is serialized using ``fee_analysis_serializer``
+5. The result appears in the output under the name ``fee_analysis``
 
 **Configuration Format**
 
@@ -688,7 +786,8 @@ Post-processors allow you to combine and transform data from multiple API calls 
 
    [[post_processors]]
    name = "processor_name"          # Required: unique identifier
-   module = "module_name"           # Required: Python module
+   module = "module_name"           # Required if not using client reference
+   client = "client_name"           # Optional: reference to client for module
    class = "ClassName"              # Required: class to instantiate
    method = "method_name"           # Optional: method to call
    inputs = ["api1", "api2"]        # Required: list of API names
@@ -696,6 +795,7 @@ Post-processors allow you to combine and transform data from multiple API calls 
 
 **Key Features**
 
+* Use client references to avoid repeating module names
 * Use any existing Python class from installed packages
 * Combine data from multiple API calls
 * Chain multiple post-processors together
