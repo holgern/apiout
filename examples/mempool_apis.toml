@@ -1,40 +1,35 @@
 # Configuration for fetching mempool data using apiout
 # This replaces btcticker/mempool.py functionality
 
-[[apis]]
-name = "block_tip_hash"
+[clients.mempool]
 module = "pymempool"
 client_class = "MempoolAPI"
+init_params = {api_base_url = "https://mempool.space/api/"}
+
+[[apis]]
+name = "block_tip_hash"
+client = "mempool"
 method = "get_block_tip_hash"
-url = "https://mempool.space/api/"
 
 [[apis]]
 name = "block_tip_height"
-module = "pymempool"
-client_class = "MempoolAPI"
+client = "mempool"
 method = "get_block_tip_height"
-url = "https://mempool.space/api/"
 
 [[apis]]
 name = "recommended_fees"
-module = "pymempool"
-client_class = "MempoolAPI"
+client = "mempool"
 method = "get_recommended_fees"
-url = "https://mempool.space/api/"
 
 [[apis]]
 name = "difficulty_adjustment"
-module = "pymempool"
-client_class = "MempoolAPI"
+client = "mempool"
 method = "get_difficulty_adjustment"
-url = "https://mempool.space/api/"
 
 [[apis]]
 name = "mempool_blocks_fee"
-module = "pymempool"
-client_class = "MempoolAPI"
+client = "mempool"
 method = "get_mempool_blocks_fee"
-url = "https://mempool.space/api/"
 
 [[post_processors]]
 name = "fee_analysis"

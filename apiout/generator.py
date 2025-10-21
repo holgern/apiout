@@ -243,21 +243,29 @@ def introspect_and_generate(
     module_name: str,
     client_class: str,
     method_name: str,
-    url: str,
-    params: dict[str, Any],
+    url: Optional[str] = None,
+    params: Optional[dict[str, Any]] = None,
+    init_params: Optional[dict[str, Any]] = None,
     serializer_name: str = "generated",
 ) -> str:
     try:
         module = importlib.import_module(module_name)
         client_cls = getattr(module, client_class)
-        client = client_cls()
+
+        if init_params:
+            client = client_cls(**init_params)
+        else:
+            client = client_cls()
+
         method = getattr(client, method_name)
 
         sig = inspect.signature(method)
         method_params = list(sig.parameters.keys())
 
-        if "params" in method_params:
-            response = method(url, params=params)
+        if url is not None and "params" in method_params:
+            response = method(url, params=params or {})
+        elif url is not None and len(method_params) > 0:
+            response = method(url)
         else:
             response = method()
 
@@ -350,7 +358,8 @@ def introspect_post_processor_and_generate(
         module_name: Module containing the post-processor class
         class_name: Post-processor class name
         method_name: Optional method to call on the instance
-        input_modules: List of dicts with 'module', 'client_class', 'method' keys
+        input_modules: List of dicts with 'module', 'client_class',
+            'method', optional 'init_params', 'url', 'params' keys
         serializer_name: Name for the generated serializer
     """
     try:
@@ -359,16 +368,25 @@ def introspect_post_processor_and_generate(
         for input_config in input_modules:
             input_module = importlib.import_module(input_config["module"])
             input_client_cls = getattr(input_module, input_config["client_class"])
-            input_client = input_client_cls()
+
+            init_params = input_config.get("init_params")
+            if init_params:
+                input_client = input_client_cls(**init_params)
+            else:
+                input_client = input_client_cls()
+
             input_method = getattr(input_client, input_config["method"])
 
             sig = inspect.signature(input_method)
             method_params = list(sig.parameters.keys())
 
-            if "params" in method_params:
-                response = input_method(
-                    input_config.get("url", ""), params=input_config.get("params", {})
-                )
+            url = input_config.get("url")
+            params = input_config.get("params", {})
+
+            if url is not None and "params" in method_params:
+                response = input_method(url, params=params)
+            elif url is not None and len(method_params) > 0:
+                response = input_method(url)
             else:
                 response = input_method()
 

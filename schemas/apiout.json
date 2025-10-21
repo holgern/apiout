@@ -5,6 +5,13 @@
   "description": "Configuration schema for apiout - a tool for fetching and serializing API data",
   "type": "object",
   "properties": {
+    "clients": {
+      "type": "object",
+      "description": "Named client configurations that can be referenced by multiple APIs",
+      "additionalProperties": {
+        "$ref": "#/definitions/client"
+      }
+    },
     "apis": {
       "type": "array",
       "description": "List of API configurations to fetch",
@@ -28,18 +35,44 @@
     }
   },
   "definitions": {
+    "client": {
+      "type": "object",
+      "description": "Reusable client configuration that can be referenced by multiple APIs",
+      "required": ["module"],
+      "properties": {
+        "module": {
+          "type": "string",
+          "description": "Python module to import"
+        },
+        "client_class": {
+          "type": "string",
+          "description": "Name of the client class (default: 'Client')",
+          "default": "Client"
+        },
+        "init_params": {
+          "type": "object",
+          "description": "Parameters to pass to the client class constructor",
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": false
+    },
     "api": {
       "type": "object",
       "description": "Configuration for a single API call",
-      "required": ["name", "module", "method"],
+      "required": ["name", "method"],
       "properties": {
         "name": {
           "type": "string",
           "description": "Unique identifier for this API"
         },
+        "client": {
+          "type": "string",
+          "description": "Reference to a client configuration defined in the clients section"
+        },
         "module": {
           "type": "string",
-          "description": "Python module to import"
+          "description": "Python module to import (not required if 'client' is specified)"
         },
         "client_class": {
           "type": "string",
@@ -65,7 +98,7 @@
         },
         "init_params": {
           "type": "object",
-          "description": "Parameters to pass to the client class constructor (requires client_id)",
+          "description": "Parameters to pass to the client class constructor (can override client-level init_params)",
           "additionalProperties": true
         },
         "params": {
@@ -154,15 +187,19 @@
     "post_processor": {
       "type": "object",
       "description": "Configuration for post-processing API results",
-      "required": ["name", "module", "class", "inputs"],
+      "required": ["name", "class", "inputs"],
       "properties": {
         "name": {
           "type": "string",
           "description": "Unique identifier for this post-processor"
         },
+        "client": {
+          "type": "string",
+          "description": "Reference to a client configuration defined in the clients section"
+        },
         "module": {
           "type": "string",
-          "description": "Python module containing the processor class"
+          "description": "Python module containing the processor class (not required if 'client' is specified)"
         },
         "class": {
           "type": "string",

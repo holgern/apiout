@@ -37,7 +37,7 @@ def generate_cmd(
         raise typer.Exit(1) from e
 
     result = introspect_and_generate(
-        module, client_class, method, url, params_dict, name
+        module, client_class, method, url, params_dict, None, name
     )
 
     console.print(result)
@@ -48,6 +48,7 @@ def _load_config_files(config_paths: list[Path]) -> dict[str, Any]:
         "apis": [],
         "serializers": {},
         "post_processors": [],
+        "clients": {},
     }
 
     for config_path in config_paths:
@@ -69,6 +70,9 @@ def _load_config_files(config_paths: list[Path]) -> dict[str, Any]:
                     config_data["post_processors"].extend(
                         current_config["post_processors"]
                     )
+
+                if "clients" in current_config:
+                    config_data["clients"].update(current_config["clients"])
         except Exception as e:
             err_console.print(
                 f"[red]Error reading config file {config_path}: {e}[/red]"
@@ -96,7 +100,7 @@ def _load_serializer_files(serializer_paths: list[Path]) -> dict[str, Any]:
     return serializers
 
 
-def _process_api(api, all_serializers, err_console):
+def _process_api(api, all_serializers, err_console, client_configs):
     if "name" not in api:
         err_console.print("[red]Error: Each API must have a 'name' field[/red]")
         raise typer.Exit(1)
@@ -105,8 +109,17 @@ def _process_api(api, all_serializers, err_console):
     module = api.get("module")
     client_class = api.get("client_class", "Client")
     method = api.get("method")
-    url = api.get("url", "")
-    params = api.get("params", {})
+    url = api.get("url")
+    params = api.get("params")
+    init_params = api.get("init_params")
+
+    client_ref = api.get("client")
+    if client_ref and client_ref in client_configs:
+        client_config = client_configs[client_ref]
+        if not module:
+            module = client_config.get("module")
+        client_class = client_config.get("client_class", "Client")
+        init_params = client_config.get("init_params", {})
 
     if not module or not method:
         err_console.print(
@@ -118,7 +131,7 @@ def _process_api(api, all_serializers, err_console):
 
     try:
         result = introspect_and_generate(
-            module, client_class, method, url, params, f"{name}_serializer"
+            module, client_class, method, url, params, init_params, f"{name}_serializer"
         )
         all_serializers.append(result)
     except Exception as e:
@@ -149,10 +162,11 @@ def generate_from_config_cmd(
         raise typer.Exit(1)
 
     apis = config_data["apis"]
+    clients = config_data.get("clients", {})
     all_serializers: list[str] = []
 
     for api in apis:
-        _process_api(api, all_serializers, err_console)
+        _process_api(api, all_serializers, err_console, clients)
 
     combined_output = "\n\n".join(all_serializers)
 
@@ -195,13 +209,26 @@ def generate_from_config_cmd(
                 )
                 break
 
+            module_name = input_api.get("module")
+            client_class_name = input_api.get("client_class", "Client")
+            init_params = input_api.get("init_params")
+
+            client_ref = input_api.get("client")
+            if client_ref and client_ref in clients:
+                client_config = clients[client_ref]
+                if not module_name:
+                    module_name = client_config.get("module")
+                client_class_name = client_config.get("client_class", "Client")
+                init_params = client_config.get("init_params")
+
             input_configs.append(
                 {
-                    "module": input_api.get("module"),
-                    "client_class": input_api.get("client_class", "Client"),
+                    "module": module_name,
+                    "client_class": client_class_name,
                     "method": input_api.get("method"),
-                    "url": input_api.get("url", ""),
-                    "params": input_api.get("params", {}),
+                    "url": input_api.get("url"),
+                    "params": input_api.get("params"),
+                    "init_params": init_params,
                 }
             )
 

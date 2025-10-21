@@ -118,7 +118,42 @@ Run with both files:
 
    apiout run -c apis.toml -s serializers.toml --json
 
-4. With JSON Input
+4. With Reusable Client Configurations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When multiple APIs use the same client, define it once and reference it:
+
+.. code-block:: toml
+
+   [clients.mempool]
+   module = "pymempool"
+   client_class = "MempoolAPI"
+   init_params = {api_base_url = "https://mempool.space/api/"}
+
+   [[apis]]
+   name = "block_tip_hash"
+   client = "mempool"
+   method = "get_block_tip_hash"
+
+   [[apis]]
+   name = "block_tip_height"
+   client = "mempool"
+   method = "get_block_tip_height"
+
+   [[apis]]
+   name = "recommended_fees"
+   client = "mempool"
+   method = "get_recommended_fees"
+
+Run the command:
+
+.. code-block:: bash
+
+   apiout run -c apis.toml --json
+
+This eliminates repetition when multiple APIs share the same client configuration.
+
+5. With JSON Input
 ~~~~~~~~~~~~~~~~~~
 
 You can provide configuration as JSON via stdin instead of TOML files:

@@ -554,6 +554,84 @@ Combining Multiple APIs
      echo "}"
    } | jq -s '.[0]'
 
+Reusable Client Configurations Example
+---------------------------------------
+
+Eliminating Configuration Repetition
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When multiple APIs use the same client, define it once and reference it multiple times.
+
+**Without Client References** (repetitive):
+
+.. code-block:: toml
+
+   [[apis]]
+   name = "block_tip_hash"
+   module = "pymempool"
+   client_class = "MempoolAPI"
+   init_params = {api_base_url = "https://mempool.space/api/"}
+   method = "get_block_tip_hash"
+
+   [[apis]]
+   name = "block_tip_height"
+   module = "pymempool"
+   client_class = "MempoolAPI"
+   init_params = {api_base_url = "https://mempool.space/api/"}
+   method = "get_block_tip_height"
+
+**With Client References** (clean and maintainable):
+
+``mempool_apis.toml``:
+
+.. code-block:: toml
+
+   [clients.mempool]
+   module = "pymempool"
+   client_class = "MempoolAPI"
+   init_params = {api_base_url = "https://mempool.space/api/"}
+
+   [[apis]]
+   name = "block_tip_hash"
+   client = "mempool"
+   method = "get_block_tip_hash"
+
+   [[apis]]
+   name = "block_tip_height"
+   client = "mempool"
+   method = "get_block_tip_height"
+
+   [[apis]]
+   name = "recommended_fees"
+   client = "mempool"
+   method = "get_recommended_fees"
+
+   [[apis]]
+   name = "difficulty_adjustment"
+   client = "mempool"
+   method = "get_difficulty_adjustment"
+
+**Running the Example**
+
+.. code-block:: bash
+
+   pip install pymempool
+   apiout run -c mempool_apis.toml --json
+
+**How It Works**
+
+1. The ``[clients.mempool]`` section defines the client configuration once
+2. Each API references ``client = "mempool"`` instead of repeating initialization
+3. All APIs share the same client instance
+4. Changing the API URL only requires updating one line
+
+**Benefits**
+
+* Define client configuration once, use it many times
+* Update client settings in one place
+* Cleaner, more maintainable configurations
+* Automatic instance sharing across referenced APIs
+
 Post-Processor Example
 ----------------------
 
@@ -568,19 +646,20 @@ Post-processors allow you to combine and transform data from multiple API calls 
 
 .. code-block:: toml
 
-   [[apis]]
-   name = "recommended_fees"
+   [clients.mempool]
    module = "pymempool"
    client_class = "MempoolAPI"
+   init_params = {api_base_url = "https://mempool.space/api/"}
+
+   [[apis]]
+   name = "recommended_fees"
+   client = "mempool"
    method = "get_recommended_fees"
-   url = "https://mempool.space/api/"
 
    [[apis]]
    name = "mempool_blocks_fee"
-   module = "pymempool"
-   client_class = "MempoolAPI"
+   client = "mempool"
    method = "get_mempool_blocks_fee"
-   url = "https://mempool.space/api/"
 
    [[post_processors]]
    name = "fee_analysis"

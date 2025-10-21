@@ -44,6 +44,7 @@ Optional Fields
 * ``client_id``: Identifier for sharing client instances across multiple API calls
 * ``init_params``: Parameters to pass to the client class constructor
 * ``init_method``: Method to call once after client instantiation
+* ``client``: Reference to a client configuration from the ``[clients]`` section
 
 Multiple APIs
 ^^^^^^^^^^^^^
@@ -209,6 +210,79 @@ If no serializer is specified, apiout uses default serialization:
 
 Advanced Features
 -----------------
+
+Reusable Client Configurations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When multiple APIs use the same client with identical initialization parameters, you can define the client once in a ``[clients]`` section and reference it from multiple APIs. This eliminates repetition and makes configurations easier to maintain.
+
+Configuration
+^^^^^^^^^^^^^
+
+.. code-block:: toml
+
+   [clients.mempool]
+   module = "pymempool"
+   client_class = "MempoolAPI"
+   init_params = {api_base_url = "https://mempool.space/api/"}
+
+   [[apis]]
+   name = "block_tip_hash"
+   client = "mempool"
+   method = "get_block_tip_hash"
+
+   [[apis]]
+   name = "block_tip_height"
+   client = "mempool"
+   method = "get_block_tip_height"
+
+   [[apis]]
+   name = "recommended_fees"
+   client = "mempool"
+   method = "get_recommended_fees"
+
+How It Works
+^^^^^^^^^^^^
+
+1. Define a client in the ``[clients.<name>]`` section with:
+
+   * ``module``: Python module containing the client class
+   * ``client_class``: Name of the client class
+   * ``init_params``: Parameters to pass to the constructor (optional)
+
+2. Reference the client from APIs using ``client = "<name>"``
+
+3. Each API referencing the same client shares one instance
+
+4. Only the ``method`` and ``params`` need to be specified for each API
+
+Benefits
+^^^^^^^^
+
+* **Eliminate Repetition**: Define client configuration once, reference it multiple times
+* **Easier Maintenance**: Update client settings in one place
+* **Cleaner Configs**: Focus on what each API does, not how to initialize the client
+* **Shared Instances**: All APIs using the same client reference share one instance
+
+Compatibility
+^^^^^^^^^^^^^
+
+The ``client`` reference can be used alongside traditional configuration:
+
+* If ``client`` is specified, ``module``, ``client_class``, and ``init_params`` are taken from the client definition
+* Inline ``init_params`` can override or extend client-level ``init_params``
+* If no ``client`` is specified, traditional inline configuration is used
+
+Multiple Configuration Files
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Client definitions are merged from multiple configuration files:
+
+.. code-block:: bash
+
+   apiout run -c base.toml -c apis.toml
+
+If the same client name appears in multiple files, later files override earlier ones.
 
 Shared Client Instances
 ~~~~~~~~~~~~~~~~~~~~~~~

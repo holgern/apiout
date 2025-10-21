@@ -195,8 +195,9 @@ def test_introspect_and_generate_with_dict_response():
                 "test_module",
                 "TestClient",
                 "test_method",
-                "",
-                {},
+                None,
+                None,
+                None,
                 "test_serializer",
             )
 
@@ -224,8 +225,9 @@ def test_introspect_and_generate_with_simple_response():
                 "test_module",
                 "TestClient",
                 "test_method",
-                "",
-                {},
+                None,
+                None,
+                None,
                 "test_serializer",
             )
 
