@@ -8,7 +8,7 @@ from unittest.mock import patch
 import pytest
 import typer
 
-from apiout.cli import _get_config_dir, _load_env_file, _load_config_files
+from apiout.cli import _get_config_dir, _load_config_files, _load_env_file
 
 
 class TestGetConfigDir:

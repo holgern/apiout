@@ -118,7 +118,7 @@ apiout run -c apis.toml --json
 
 ### 4. Environment Files
 
-For cleaner configuration management, you can store reusable API configurations in 
+For cleaner configuration management, you can store reusable API configurations in
 `~/.config/apiout/` and load them with the `-e`/`--env` flag:
 
 **Setup:**
@@ -180,6 +180,7 @@ apiout run -e mempool -c custom.toml --json
 **XDG Base Directory Support:**
 
 The tool follows the XDG Base Directory specification:
+
 - Uses `$XDG_CONFIG_HOME/apiout/` if set
 - Falls back to `~/.config/apiout/` otherwise
 
@@ -205,9 +206,12 @@ apiout run -e <env1> -e <env2> -c <config.toml> [--json]
 
 **Options:**
 
-- `-e, --env`: Environment name to load from `~/.config/apiout/` (can be specified multiple times)
-- `-c, --config`: Path to API configuration file (TOML format, can be specified multiple times)
-- `-s, --serializers`: Path to serializers configuration file (optional, can be specified multiple times)
+- `-e, --env`: Environment name to load from `~/.config/apiout/` (can be specified
+  multiple times)
+- `-c, --config`: Path to API configuration file (TOML format, can be specified multiple
+  times)
+- `-s, --serializers`: Path to serializers configuration file (optional, can be
+  specified multiple times)
 - `--json`: Output as JSON format (default: pretty-printed)
 
 **Using JSON Input from stdin:**
