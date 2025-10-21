@@ -24,6 +24,83 @@ Run it:
 apiout run -c examples/apis.toml -s examples/serializers.toml --json
 ```
 
+## Shared Client Instance Example: Bitcoin Price Ticker
+
+- **File**: `btcpriceticker.toml`
+- **Python Example**: `btcpriceticker_example.py`
+- **Description**: Demonstrates using shared client instances to fetch multiple data
+  points from a single initialized client
+
+This example shows how to:
+
+1. Share a single client instance across multiple API calls using `client_id`
+2. Initialize the client once with `init_method` and `init_params`
+3. Call multiple methods on the same instance without re-fetching data
+
+### Prerequisites
+
+Install btcpriceticker:
+
+```bash
+pip install btcpriceticker
+```
+
+### Running the CLI Example
+
+```bash
+apiout run -c examples/btcpriceticker.toml --json
+```
+
+### Running the Python Example
+
+```bash
+python examples/btcpriceticker_example.py
+```
+
+Or from the project root:
+
+```bash
+python -m examples.btcpriceticker_example
+```
+
+### How It Works
+
+1. **First API** (`btc_price_usd`):
+
+   - Creates `Price` instance with
+     `init_params = {fiat = "EUR", days_ago = 1, service = "coinpaprika"}`
+   - Calls `update_service()` method once to fetch price data
+   - Calls `get_usd_price()` and stores the instance with `client_id = "btc_price"`
+
+2. **Subsequent APIs** (all others):
+   - Reuse the same `Price` instance via `client_id = "btc_price"`
+   - No re-initialization or re-fetching
+   - Simply call their respective methods on the cached data
+
+### Configuration
+
+The key features used:
+
+```toml
+[[apis]]
+name = "btc_price_usd"
+client_id = "btc_price"           # Identifies shared instance
+init_method = "update_service"    # Called once after instantiation
+init_params = {fiat = "EUR", days_ago = 1, service = "coinpaprika"}
+method = "get_usd_price"
+
+[[apis]]
+name = "btc_price_eur"
+client_id = "btc_price"           # Reuses the same instance
+method = "get_fiat_price"
+```
+
+**Benefits:**
+
+- Single data fetch for multiple queries
+- Consistent data across all method calls
+- Improved performance by avoiding redundant operations
+
 ## Advanced Example: Mempool Post-Processor
 
 - **Files**:

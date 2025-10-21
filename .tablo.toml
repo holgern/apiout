@@ -43,4 +43,3 @@ compact_arrays = false
 column_width = 88
 trailing_newline = true
 allowed_blank_lines = 1
-

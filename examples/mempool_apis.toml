@@ -42,3 +42,10 @@ module = "pymempool"
 class = "RecommendedFees"
 inputs = ["recommended_fees", "mempool_blocks_fee"]
 serializer = "fee_analysis_serializer"
+
+[[post_processors]]
+name = "last_block"
+module = "pymempool"
+class = "MempoolAPI"
+method = "get_block"
+inputs = ["block_tip_hash"]

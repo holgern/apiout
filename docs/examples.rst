@@ -354,6 +354,173 @@ With Custom Serializer
    result = fetch_api_data(api_config, serializers)
    print(result)
 
+Shared Client Instances Example
+--------------------------------
+
+Bitcoin Price Ticker
+~~~~~~~~~~~~~~~~~~~~
+
+When working with APIs that require initialization before calling multiple methods, use shared client instances:
+
+**Problem**: The ``btcpriceticker.Price`` class needs ``update_service()`` called once to fetch data, then multiple methods can query the same data.
+
+**Solution**: Use ``client_id`` to share one instance across multiple API calls.
+
+``btcpriceticker.toml``:
+
+.. code-block:: toml
+
+   [[apis]]
+   name = "btc_price_eur"
+   module = "btcpriceticker"
+   client_class = "Price"
+   client_id = "btc_price"
+   init_method = "update_service"
+   init_params = {fiat = "EUR"}
+   method = "get_price_now"
+
+   [[apis]]
+   name = "btc_price_usd"
+   module = "btcpriceticker"
+   client_class = "Price"
+   client_id = "btc_price"
+   method = "get_usd_price"
+
+   [[apis]]
+   name = "btc_price_eur_without_refresh"
+   module = "btcpriceticker"
+   client_class = "Price"
+   client_id = "btc_price"
+   method = "get_fiat_price"
+   fiat = "EUR"
+
+**Running the Example**
+
+.. code-block:: bash
+
+   pip install btcpriceticker
+   apiout run -c btcpriceticker.toml --json
+
+**How It Works**
+
+1. First API (``btc_price_eur``):
+
+   * ``Price`` is instantiated with ``fiat="EUR"``
+   * ``update_service()`` is called once to fetch price data
+   * ``get_price_now()`` is called
+   * Instance is stored with key ``"btc_price"``
+
+2. Second API (``btc_price_usd``):
+
+   * Reuses the existing ``Price`` instance
+   * No re-initialization or re-fetching
+   * Simply calls ``get_usd_price()`` on the same instance
+
+3. Third API (``btc_price_eur_without_refresh``):
+
+   * Reuses the same instance again
+   * Calls ``get_fiat_price("EUR")`` on the same data
+
+**Expected Output**
+
+.. code-block:: json
+
+   {
+     "btc_price_eur": 89234.56,
+     "btc_price_usd": 94523.12,
+     "btc_price_eur_without_refresh": 89234.56
+   }
+
+**Key Configuration Options**
+
+* ``client_id``: Unique identifier for sharing instances (e.g., ``"btc_price"``)
+* ``init_method``: Method to call once after instantiation (e.g., ``"update_service"``)
+* ``init_params``: Parameters passed to the constructor (e.g., ``{fiat = "EUR"}``)
+
+**Benefits**
+
+* Single data fetch for multiple queries
+* Consistent data across all method calls
+* Improved performance by avoiding redundant operations
+
+Multiple Configuration Files Example
+-------------------------------------
+
+Organizing Large Projects
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+For large projects, split configurations into multiple files:
+
+**Base Configuration** (``base.toml``):
+
+.. code-block:: toml
+
+   [serializers.common]
+   [serializers.common.fields]
+   timestamp = "Timestamp"
+   status = "Status"
+
+**API Configurations** (``weather_apis.toml``):
+
+.. code-block:: toml
+
+   [[apis]]
+   name = "berlin_weather"
+   module = "openmeteo_requests"
+   method = "weather_api"
+   url = "https://api.open-meteo.com/v1/forecast"
+   serializer = "openmeteo"
+
+   [apis.params]
+   latitude = 52.52
+   longitude = 13.41
+   current = ["temperature_2m"]
+
+**Additional APIs** (``more_apis.toml``):
+
+.. code-block:: toml
+
+   [[apis]]
+   name = "munich_weather"
+   module = "openmeteo_requests"
+   method = "weather_api"
+   url = "https://api.open-meteo.com/v1/forecast"
+   serializer = "openmeteo"
+
+   [apis.params]
+   latitude = 48.1351
+   longitude = 11.5820
+   current = ["temperature_2m"]
+
+**Custom Serializers** (``custom_serializers.toml``):
+
+.. code-block:: toml
+
+   [serializers.openmeteo]
+   [serializers.openmeteo.fields]
+   latitude = "Latitude"
+   longitude = "Longitude"
+
+**Running the Example**
+
+.. code-block:: bash
+
+   apiout run -c base.toml -c weather_apis.toml -c more_apis.toml -s custom_serializers.toml --json
+
+**How It Works**
+
+1. Config files are merged in order: base → weather_apis → more_apis
+2. All APIs are collected: ``berlin_weather``, ``munich_weather``
+3. Serializers from ``custom_serializers.toml`` override any with the same name from ``base.toml``
+4. APIs are executed and serialized
+
+**Benefits**
+
+* Organize related APIs together
+* Share common configurations across projects
+* Override serializers for different environments
+* Keep configurations maintainable and modular
+
 Pipeline Integration Example
 -----------------------------
 

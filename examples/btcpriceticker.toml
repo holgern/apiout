@@ -1,0 +1,50 @@
+[[apis]]
+name = "btc_price_usd"
+module = "btcpriceticker"
+client_class = "Price"
+client_id = "btc_price"
+init_method = "update_service"
+init_params = {fiat = "EUR", days_ago= 1, service="coinpaprika"}
+method = "get_usd_price"
+
+[[apis]]
+name = "btc_price_eur"
+module = "btcpriceticker"
+client_class = "Price"
+client_id = "btc_price"
+method = "get_fiat_price"
+
+[[apis]]
+name = "btc_price_timestamp"
+module = "btcpriceticker"
+client_class = "Price"
+client_id = "btc_price"
+method = "get_timestamp"
+
+[[apis]]
+name = "btc_price_sats_per_fiat"
+module = "btcpriceticker"
+client_class = "Price"
+client_id = "btc_price"
+method = "get_sats_per_fiat"
+
+[[apis]]
+name = "btc_price_sats_per_usd"
+module = "btcpriceticker"
+client_class = "Price"
+client_id = "btc_price"
+method = "get_sats_per_usd"
+
+[[apis]]
+name = "btc_price_change"
+module = "btcpriceticker"
+client_class = "Price"
+client_id = "btc_price"
+method = "get_price_change"
+
+[[apis]]
+name = "btc_price_list"
+module = "btcpriceticker"
+client_class = "Price"
+client_id = "btc_price"
+method = "get_timeseries_list"

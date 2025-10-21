@@ -41,6 +41,9 @@ Optional Fields
 * ``client_class``: Name of the client class (default: "Client")
 * ``serializer``: Reference to a serializer configuration (string) or inline serializer (dict)
 * ``params``: Dictionary of parameters to pass to the API method
+* ``client_id``: Identifier for sharing client instances across multiple API calls
+* ``init_params``: Parameters to pass to the client class constructor
+* ``init_method``: Method to call once after client instantiation
 
 Multiple APIs
 ^^^^^^^^^^^^^
@@ -206,6 +209,93 @@ If no serializer is specified, apiout uses default serialization:
 
 Advanced Features
 -----------------
+
+Shared Client Instances
+~~~~~~~~~~~~~~~~~~~~~~~
+
+When you need to reuse the same client instance across multiple API calls (e.g., to avoid redundant initialization or data fetching), use shared client instances.
+
+Configuration
+^^^^^^^^^^^^^
+
+.. code-block:: toml
+
+   [[apis]]
+   name = "btc_price_eur"
+   module = "btcpriceticker"
+   client_class = "Price"
+   client_id = "btc_price"           # Identifies this shared instance
+   init_method = "update_service"    # Called once after instantiation
+   init_params = {fiat = "EUR"}      # Passed to constructor
+   method = "get_price_now"
+
+   [[apis]]
+   name = "btc_price_usd"
+   module = "btcpriceticker"
+   client_class = "Price"
+   client_id = "btc_price"           # Reuses the same instance
+   method = "get_usd_price"
+
+   [[apis]]
+   name = "btc_price_fiat"
+   module = "btcpriceticker"
+   client_class = "Price"
+   client_id = "btc_price"           # Reuses the same instance
+   method = "get_fiat_price"
+   fiat = "EUR"
+
+How It Works
+^^^^^^^^^^^^
+
+1. First API with ``client_id = "btc_price"``:
+
+   * Client is instantiated with ``init_params``
+   * If ``init_method`` is specified, it's called once
+   * Method is called and result is stored
+
+2. Subsequent APIs with the same ``client_id``:
+
+   * The existing client instance is reused
+   * No re-initialization occurs
+   * Only the specified method is called
+
+Benefits
+^^^^^^^^
+
+* **Performance**: Avoid redundant initialization or data fetching
+* **State Preservation**: Maintain state across multiple method calls
+* **Resource Efficiency**: Reduce memory and network overhead
+* **Consistency**: Ensure all methods operate on the same data
+
+Use Cases
+^^^^^^^^^
+
+* APIs that require expensive initialization
+* Services that fetch data once and provide multiple access methods
+* Clients with authentication that should be reused
+* Objects with cached data that multiple methods query
+
+Multiple Configuration Files
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+You can use multiple configuration and serializer files with the ``-c`` and ``-s`` options:
+
+.. code-block:: bash
+
+   apiout run -c base.toml -c apis.toml -c more_apis.toml -s serializers1.toml -s serializers2.toml
+
+Merging Behavior
+^^^^^^^^^^^^^^^^
+
+* **APIs**: Appended in order (base → apis → more_apis)
+* **Post-processors**: Appended in order
+* **Serializers**: Merged (later files override earlier ones)
+
+This allows you to:
+
+* Share common configurations across projects
+* Override serializers for different environments
+* Organize large configurations into multiple files
 
 Post-Processors
 ~~~~~~~~~~~~~~~
