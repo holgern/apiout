@@ -15,10 +15,19 @@ class TestGetConfigDir:
     """Tests for _get_config_dir function."""
 
     def test_default_config_dir(self):
-        """Test default config directory is ~/.config/apiout."""
-        with patch.dict(os.environ, {}, clear=True):
+        """Test default config directory returns a valid path."""
+        # Don't clear environment on Windows - need HOME/USERPROFILE
+        if os.name == "nt":
+            # On Windows, ensure LOCALAPPDATA is available or test will use fallback
             config_dir = _get_config_dir()
-            assert config_dir == Path.home() / ".config" / "apiout"
+            # Just verify it's a Path and contains "apiout"
+            assert isinstance(config_dir, Path)
+            assert config_dir.name == "apiout"
+        else:
+            # On Unix, can safely clear environment
+            with patch.dict(os.environ, {}, clear=True):
+                config_dir = _get_config_dir()
+                assert config_dir == Path.home() / ".config" / "apiout"
 
     def test_xdg_config_home_override(self):
         """Test XDG_CONFIG_HOME environment variable override."""
@@ -33,6 +42,20 @@ class TestGetConfigDir:
             config_dir = _get_config_dir()
             expected = Path.home() / "custom_config" / "apiout"
             assert config_dir == expected
+
+    def test_windows_localappdata(self):
+        """Test Windows LOCALAPPDATA usage when available."""
+        if os.name == "nt":
+            # Test only on actual Windows
+            local_app_data = os.environ.get("LOCALAPPDATA")
+            if local_app_data:
+                # Clear XDG_CONFIG_HOME to ensure LOCALAPPDATA is used
+                env = {k: v for k, v in os.environ.items() if k != "XDG_CONFIG_HOME"}
+                with patch.dict(os.environ, env, clear=True):
+                    config_dir = _get_config_dir()
+                    assert config_dir == Path(local_app_data) / "apiout"
+        else:
+            pytest.skip("Windows-specific test")
 
 
 class TestLoadEnvFile:

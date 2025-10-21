@@ -24,14 +24,27 @@ def _get_config_dir() -> Path:
     """
     Get the apiout configuration directory following XDG Base Directory spec.
 
+    On Unix-like systems: ~/.config/apiout/ (or $XDG_CONFIG_HOME/apiout/)
+    On Windows: %LOCALAPPDATA%/apiout/ (or $XDG_CONFIG_HOME/apiout/)
+
     Returns:
-        Path to ~/.config/apiout/ (or $XDG_CONFIG_HOME/apiout/)
+        Path to the configuration directory
     """
     xdg_config_home = os.environ.get("XDG_CONFIG_HOME")
     if xdg_config_home:
         config_dir = Path(xdg_config_home).expanduser() / "apiout"
     else:
-        config_dir = Path.home() / ".config" / "apiout"
+        # Use platform-specific config directory
+        if os.name == "nt":  # Windows
+            # Use %LOCALAPPDATA% on Windows
+            local_app_data = os.environ.get("LOCALAPPDATA")
+            if local_app_data:
+                config_dir = Path(local_app_data) / "apiout"
+            else:
+                # Fallback to user profile
+                config_dir = Path.home() / "AppData" / "Local" / "apiout"
+        else:  # Unix-like (Linux, macOS)
+            config_dir = Path.home() / ".config" / "apiout"
 
     return config_dir
 
