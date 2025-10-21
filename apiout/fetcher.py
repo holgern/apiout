@@ -10,11 +10,15 @@ This module provides functionality for:
 
 import importlib
 import inspect
+import sys
 import time
 from pathlib import Path
 from typing import Any, Optional, Union
 
-import tomli
+if sys.version_info >= (3, 11):
+    import tomllib
+else:
+    import tomli as tomllib  # type: ignore[import-not-found]
 
 from .serializer import serialize_response
 
@@ -362,7 +366,7 @@ class ApiClient:
             Parsed configuration dict
         """
         with open(config_path, "rb") as f:
-            return tomli.load(f)
+            return tomllib.load(f)
 
     def fetch(self) -> dict[str, Any]:
         """
