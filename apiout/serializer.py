@@ -24,11 +24,14 @@ def serialize_value(obj: Any) -> Any:
 
 
 def call_method_or_attr(obj: Any, name: str) -> Any:
+    if isinstance(obj, dict):
+        return obj.get(name)
+
     attr = getattr(obj, name)
     if callable(attr):
         result = attr()
         if hasattr(result, "tolist"):
-            return result.tolist()
+            return result.tolist()  # type: ignore[union-attr]
         return result
     return attr
 
@@ -87,7 +90,8 @@ def apply_field_mapping(obj: Any, field_config: Any) -> Any:
 
 
 def apply_config_serializer(responses: Any, serializer_config: dict[str, Any]) -> Any:
-    if not isinstance(responses, list):
+    is_single = not isinstance(responses, list)
+    if is_single:
         responses = [responses]
 
     results = []
@@ -98,7 +102,7 @@ def apply_config_serializer(responses: Any, serializer_config: dict[str, Any]) -
         else:
             results.append(serialize_value(response))
 
-    return results
+    return results[0] if is_single else results
 
 
 def serialize_response(responses: Any, serializer_config: dict[str, Any]) -> Any:

@@ -326,7 +326,8 @@ apiout gen-api \
 
 ### `gen-serializer` - Generate Serializer Config
 
-Introspect an API response and generate a serializer configuration from an existing API config:
+Introspect an API response and generate a serializer configuration from an existing API
+config:
 
 ```bash
 # Generate serializer from API config
@@ -353,6 +354,7 @@ apiout gen-serializer --env production --api recommended_fees
 **Example:**
 
 Given a config file `mempool.toml`:
+
 ```toml
 [clients.mempool]
 module = "pymempool"
@@ -366,11 +368,13 @@ method = "get_block_tip_hash"
 ```
 
 Running:
+
 ```bash
 apiout gen-serializer --config mempool.toml --api block_tip_hash
 ```
 
 Outputs:
+
 ```toml
 [serializers.block_tip_hash_serializer]
 [serializers.block_tip_hash_serializer.fields]

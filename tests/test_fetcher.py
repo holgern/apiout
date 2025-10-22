@@ -71,9 +71,8 @@ def test_fetch_api_data_with_serializer(mock_import):
 
     result = fetch_api_data(config)
 
-    assert isinstance(result, list)
-    assert len(result) == 1
-    assert result[0] == {"value": 42}
+    assert isinstance(result, dict)
+    assert result == {"value": 42}
 
 
 @patch("apiout.fetcher.importlib.import_module")

@@ -506,7 +506,8 @@ def test_gen_serializer_with_config(tmp_path, monkeypatch):
     from unittest.mock import Mock
 
     mock_introspect = Mock(
-        return_value="[serializers.test_api_serializer]\n[serializers.test_api_serializer.fields]\nvalue = 'data'"
+        return_value="[serializers.test_api_serializer]\n"
+        "[serializers.test_api_serializer.fields]\nvalue = 'data'"
     )
     monkeypatch.setattr("apiout.cli.introspect_and_generate", mock_introspect)
 
@@ -542,7 +543,8 @@ def test_gen_serializer_with_client_ref(tmp_path, monkeypatch):
     from unittest.mock import Mock
 
     mock_introspect = Mock(
-        return_value="[serializers.mempool_api_serializer]\n[serializers.mempool_api_serializer.fields]\nhash = 'hash'"
+        return_value="[serializers.mempool_api_serializer]\n"
+        "[serializers.mempool_api_serializer.fields]\nhash = 'hash'"
     )
     monkeypatch.setattr("apiout.cli.introspect_and_generate", mock_introspect)
 
@@ -630,7 +632,8 @@ def test_gen_serializer_with_user_defaults(tmp_path, monkeypatch):
     from unittest.mock import Mock
 
     mock_introspect = Mock(
-        return_value="[serializers.test_api_serializer]\n[serializers.test_api_serializer.fields]\nvalue = 'data'"
+        return_value="[serializers.test_api_serializer]\n"
+        "[serializers.test_api_serializer.fields]\nvalue = 'data'"
     )
     monkeypatch.setattr("apiout.cli.introspect_and_generate", mock_introspect)
 

@@ -165,7 +165,7 @@ def test_serialize_response_with_config():
     obj = MockObject(name="test", value=42)
     config = {"fields": {"n": "name"}}
     result = serialize_response(obj, config)
-    assert result == [{"n": "test"}]
+    assert result == {"n": "test"}
 
 
 def test_serialize_response_with_config_and_list():
@@ -173,3 +173,46 @@ def test_serialize_response_with_config_and_list():
     config = {"fields": {"n": "name"}}
     result = serialize_response(objs, config)
     assert result == [{"n": "a"}, {"n": "b"}]
+
+
+def test_apply_field_mapping_dict_keys():
+    data = {"fastestFee": 2, "halfHourFee": 1, "hourFee": 1}
+    config = {"fastest": "fastestFee", "hour": "hourFee"}
+    result = apply_field_mapping(data, config)
+    assert result == {"fastest": 2, "hour": 1}
+    assert "halfHourFee" not in result
+
+
+def test_apply_field_mapping_dict_rename():
+    data = {"temperature": 15.3, "location": "Berlin", "internal_id": "xyz"}
+    config = {"temp": "temperature", "city": "location"}
+    result = apply_field_mapping(data, config)
+    assert result == {"temp": 15.3, "city": "Berlin"}
+    assert "internal_id" not in result
+
+
+def test_apply_field_mapping_nested_dict():
+    data = {
+        "current": {"temperature": 15.3, "humidity": 65},
+        "location": "Berlin",
+    }
+    config = {
+        "weather": {"method": "current", "fields": {"temp": "temperature"}},
+        "city": "location",
+    }
+    result = apply_field_mapping(data, config)
+    assert result == {"weather": {"temp": 15.3}, "city": "Berlin"}
+
+
+def test_serialize_response_dict_with_config():
+    data = {"fastestFee": 2, "halfHourFee": 1, "hourFee": 1, "economyFee": 1}
+    config = {"fields": {"fastest": "fastestFee", "economy": "economyFee"}}
+    result = serialize_response(data, config)
+    assert result == {"fastest": 2, "economy": 1}
+
+
+def test_call_method_or_attr_with_dict():
+    data = {"key1": "value1", "key2": 42}
+    assert call_method_or_attr(data, "key1") == "value1"
+    assert call_method_or_attr(data, "key2") == 42
+    assert call_method_or_attr(data, "missing") is None

@@ -121,7 +121,7 @@ def test_process_post_processor_with_serializer():
     with patch("apiout.fetcher.importlib.import_module", return_value=mock_module):
         result = process_post_processor(post_processor_config, api_results)
         assert "error" not in result
-        assert result == [{"value": 42, "name": "test"}]
+        assert result == {"value": 42, "name": "test"}
 
 
 def test_process_post_processor_import_error():
