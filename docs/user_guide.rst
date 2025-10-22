@@ -450,10 +450,11 @@ When both stdin and ``-p`` are provided, stdin parameters override ``-p`` parame
 
 **How it works:**
 
-* User parameters from stdin (or ``-p`` flags) are merged into the ``params`` dictionary
-* Parameters that already exist in ``params`` are overridden
+* User parameters from stdin (or ``-p`` flags) are merged into both the ``params`` dictionary and ``init_params``
+* Parameters that already exist in ``params`` or ``init_params`` are overridden
 * New parameters not in the config are added to ``params``
-* Parameters in ``user_inputs`` are passed as method arguments (not merged into ``params``)
+* Parameters in ``user_inputs`` are passed as method arguments (not merged into ``params`` or ``init_params``)
+* When ``init_params`` are overridden, a new client instance is created with the updated parameters
 
 **Example: Override params values**
 
@@ -479,6 +480,35 @@ Override with stdin:
    echo '{"topic": "routing", "tokens": 100}' | apiout run -c api.toml
 
 This will send ``topic=routing`` and ``tokens=100`` instead of the defaults.
+
+**Example: Override init_params**
+
+Configuration file (``btcpriceticker.toml``):
+
+.. code-block:: toml
+
+   [clients.btc_price]
+   module = "btcpriceticker"
+   client_class = "Price"
+   init_params = {fiat = "EUR", days_ago = 1, service = "coinpaprika"}
+
+   [[apis]]
+   name = "btc_price"
+   client = "btc_price"
+   method = "get_fiat_price"
+
+Override client initialization parameters:
+
+.. code-block:: bash
+
+   # Change fiat currency to USD
+   apiout run -c btcpriceticker.toml -p fiat=USD
+
+   # Change service to coingecko and lookback period to 7 days
+   echo '{"service": "coingecko", "days_ago": 7}' | apiout run -c btcpriceticker.toml
+
+When ``init_params`` are overridden, apiout creates a new client instance with the updated parameters.
+This allows runtime customization without modifying configuration files.
 
 **Benefits:**
 

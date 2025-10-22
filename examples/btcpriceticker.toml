@@ -38,3 +38,18 @@ method = "get_price_change"
 name = "btc_price_list"
 client = "btc_price"
 method = "get_timeseries_list"
+
+[[apis]]
+name = "btc_price_fiat"
+client = "btc_price"
+method = "fiat"
+
+[[apis]]
+name = "btc_price_days_ago"
+client = "btc_price"
+method = "days_ago"
+
+[[apis]]
+name = "btc_price_service"
+client = "btc_price"
+method = "service"

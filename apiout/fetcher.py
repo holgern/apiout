@@ -161,19 +161,23 @@ def _resolve_client_config(
 def _get_or_create_client(
     module: Any,
     client_class_name: str,
-    client_id: Optional[str],
-    init_params: dict[str, Any],
-    init_method_name: Optional[str],
+    client_id: str | None,
+    init_params: dict[str, Any] | None,
+    init_method_name: str | None,
     shared_clients: dict[str, Any],
 ) -> Any:
     """
-    Get an existing client from shared_clients or create a new one.
+    Get or create a client instance, using a shared cache.
 
     Returns:
         Client instance
     """
-    if client_id and client_id in shared_clients:
-        return shared_clients[client_id]
+    cache_key = client_id
+    if client_id and init_params:
+        cache_key = f"{client_id}:{hash(frozenset(init_params.items()))}"
+
+    if cache_key and cache_key in shared_clients:
+        return shared_clients[cache_key]
 
     client_class = getattr(module, client_class_name)
 
@@ -186,8 +190,8 @@ def _get_or_create_client(
         init_method = getattr(client, init_method_name)
         init_method()
 
-    if client_id:
-        shared_clients[client_id] = client
+    if cache_key:
+        shared_clients[cache_key] = client
 
     return client
 
@@ -319,6 +323,13 @@ def fetch_api_data(
         if not method_name:
             return {"error": "No method specified"}
 
+        user_inputs = api_config.get("user_inputs", [])
+
+        if user_params and init_params:
+            for key, value in user_params.items():
+                if key in init_params and key not in user_inputs:
+                    init_params[key] = value
+
         module = importlib.import_module(module_name)
 
         client = _get_or_create_client(
@@ -335,7 +346,6 @@ def fetch_api_data(
         url = _substitute_env_vars(api_config.get("url", ""))
         params = _substitute_env_vars(api_config.get("params", {}))
         headers = _substitute_env_vars(api_config.get("headers", {}))
-        user_inputs = api_config.get("user_inputs", [])
         user_defaults = api_config.get("user_defaults", {})
 
         if user_params and isinstance(params, dict):
@@ -343,11 +353,13 @@ def fetch_api_data(
                 if key in params or key not in user_inputs:
                     params[key] = value
 
-        method_args, method_kwargs = _prepare_method_arguments(
-            method, url, params, headers, user_inputs, user_params, user_defaults
-        )
-
-        responses = method(*method_args, **method_kwargs)
+        if callable(method):
+            method_args, method_kwargs = _prepare_method_arguments(
+                method, url, params, headers, user_inputs, user_params, user_defaults
+            )
+            responses = method(*method_args, **method_kwargs)
+        else:
+            responses = method
 
         client_ref = api_config.get("client")
         serializer_config = resolve_serializer(
