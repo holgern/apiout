@@ -161,9 +161,9 @@ def _resolve_client_config(
 def _get_or_create_client(
     module: Any,
     client_class_name: str,
-    client_id: str | None,
-    init_params: dict[str, Any] | None,
-    init_method_name: str | None,
+    client_id: Optional[str],
+    init_params: Optional[dict[str, Any]],
+    init_method_name: Optional[str],
     shared_clients: dict[str, Any],
 ) -> Any:
     """

@@ -3,8 +3,6 @@
 import os
 from unittest.mock import patch
 
-import pytest
-
 from apiout.fetcher import _substitute_env_vars
 
 
