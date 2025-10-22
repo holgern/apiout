@@ -595,8 +595,8 @@ method = "test"
         app, ["gen-serializer", "--config", str(config_file), "--api", "missing_api"]
     )
     assert result.exit_code == 1
-    assert "API 'missing_api' not found" in result.output
-    assert "Available APIs: other_api" in result.output
+    assert "'missing_api' not found in config" in result.output
+    assert "Available: APIs: other_api" in result.output
 
 
 def test_gen_serializer_missing_module_or_method(tmp_path):
@@ -614,7 +614,7 @@ module = "test_module"
         ["gen-serializer", "--config", str(config_file), "--api", "incomplete_api"],
     )
     assert result.exit_code == 1
-    assert "missing required 'module' or 'method' field" in result.output
+    assert "is missing 'module' or 'method'" in result.output
 
 
 def test_gen_serializer_no_apis_section(tmp_path):
@@ -625,7 +625,7 @@ def test_gen_serializer_no_apis_section(tmp_path):
         app, ["gen-serializer", "--config", str(config_file), "--api", "test"]
     )
     assert result.exit_code == 1
-    assert "No 'apis' section found" in result.output
+    assert "No 'apis' or 'post_processors' section found" in result.output
 
 
 def test_gen_serializer_with_user_defaults(tmp_path, monkeypatch):

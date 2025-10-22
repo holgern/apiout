@@ -20,16 +20,19 @@ method = "get_block_tip_height"
 name = "recommended_fees"
 client = "mempool"
 method = "get_recommended_fees"
+serializer = "recommended_fees_serializer"
 
 [[apis]]
 name = "difficulty_adjustment"
 client = "mempool"
 method = "get_difficulty_adjustment"
+serializer = "difficulty_adjustment_serializer"
 
 [[apis]]
 name = "mempool_blocks_fee"
 client = "mempool"
 method = "get_mempool_blocks_fee"
+serializer = "mempool_blocks_fee_serializer"
 
 [[apis]]
 name = "block_feerates"
@@ -37,6 +40,7 @@ client = "mempool"
 method = "get_block_feerates"
 user_inputs = ["time_period"]
 user_defaults = {time_period = "24h"}
+serializer = "block_feerates_serializer"
 
 [[post_processors]]
 name = "fee_analysis"

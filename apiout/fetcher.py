@@ -178,7 +178,7 @@ def _prepare_method_arguments(
     if user_inputs:
         for user_input in user_inputs:
             if user_input in user_params:
-                value = user_params[user_input]
+                value: Any = user_params[user_input]
             elif user_input in user_defaults:
                 value = user_defaults[user_input]
             else:

@@ -34,7 +34,7 @@ blockVSize = "blockVSize"
 nTx = "nTx"
 totalFees = "totalFees"
 medianFee = "medianFee"
-
+feeRange = "feeRange"
 
 [serializers.fee_analysis_serializer]
 [serializers.fee_analysis_serializer.fields]
@@ -51,3 +51,15 @@ mempool_tx_count = "mempool_tx_count"
 mempool_vsize = "mempool_vsize"
 minimum_fee = "minimum_fee"
 n_fee_blocks = "n_fee_blocks"
+
+[serializers.block_feerates_serializer]
+[serializers.block_feerates_serializer.fields]
+avgHeight = "avgHeight"
+timestamp = "timestamp"
+avgFee_0 = "avgFee_0"
+avgFee_10 = "avgFee_10"
+avgFee_25 = "avgFee_25"
+avgFee_50 = "avgFee_50"
+avgFee_75 = "avgFee_75"
+avgFee_90 = "avgFee_90"
+avgFee_100 = "avgFee_100"

@@ -81,7 +81,9 @@ def _load_env_file(env_name: str) -> Path:
 
 @app.command("gen-serializer")
 def gen_serializer_cmd(
-    api: str = typer.Option(..., "--api", "-a", help="API name from config"),
+    api: str = typer.Option(
+        ..., "--api", "-a", help="API or post-processor name from config"
+    ),
     config: list[Path] = typer.Option(
         None,
         "-c",
@@ -104,24 +106,61 @@ def gen_serializer_cmd(
 
     config_data = _load_config_files(config_paths)
 
-    if not config_data.get("apis"):
-        err_console.print("[red]Error: No 'apis' section found in config[/red]")
+    if not config_data.get("apis") and not config_data.get("post_processors"):
+        err_console.print(
+            "[red]Error: No 'apis' or 'post_processors' section found in config[/red]"
+        )
         raise typer.Exit(1)
 
     api_config = None
-    for api_def in config_data["apis"]:
+    is_post_processor = False
+
+    # Check APIs first
+    for api_def in config_data.get("apis", []):
         if api_def.get("name") == api:
             api_config = api_def
             break
 
+    # If not found in APIs, check post-processors
     if not api_config:
-        available = ", ".join(a.get("name", "unnamed") for a in config_data["apis"])
+        for pp_def in config_data.get("post_processors", []):
+            if pp_def.get("name") == api:
+                api_config = pp_def
+                is_post_processor = True
+                break
+
+    if not api_config:
+        available_apis = ", ".join(
+            a.get("name", "unnamed") for a in config_data.get("apis", [])
+        )
+        available_pps = ", ".join(
+            p.get("name", "unnamed") for p in config_data.get("post_processors", [])
+        )
+        all_available = []
+        if available_apis:
+            all_available.append(f"APIs: {available_apis}")
+        if available_pps:
+            all_available.append(f"Post-processors: {available_pps}")
+
         err_console.print(
-            f"[red]Error: API '{api}' not found in config. "
-            f"Available APIs: {available}[/red]"
+            f"[red]Error: '{api}' not found in config. "
+            f"Available: {'; '.join(all_available)}[/red]"
         )
         raise typer.Exit(1)
 
+    try:
+        if is_post_processor:
+            _generate_post_processor_serializer(api_config, config_data)
+        else:
+            _generate_api_serializer(api_config, config_data)
+    except Exception as e:
+        err_console.print(f"[red]Error generating serializer: {e}[/red]")
+        raise typer.Exit(1) from e
+
+
+def _generate_api_serializer(
+    api_config: dict[str, Any], config_data: dict[str, Any]
+) -> None:
     module = api_config.get("module")
     client_class = api_config.get("client_class", "Client")
     method = api_config.get("method")
@@ -129,39 +168,92 @@ def gen_serializer_cmd(
     params = api_config.get("params")
     init_params = api_config.get("init_params")
     user_defaults = api_config.get("user_defaults")
+    name = api_config["name"]
 
     client_ref = api_config.get("client")
-    if client_ref and client_ref in config_data.get("clients", {}):
-        client_config = config_data["clients"][client_ref]
-        if not module:
-            module = client_config.get("module")
-        client_class = client_config.get("client_class", "Client")
-        init_params = client_config.get("init_params", {})
+    if client_ref:
+        clients = config_data.get("clients", {})
+        if client_ref in clients:
+            client_config = clients[client_ref]
+            if not module:
+                module = client_config.get("module")
+            client_class = client_config.get("client_class", "Client")
+            init_params = client_config.get("init_params", {})
 
     if not module or not method:
         err_console.print(
-            f"[red]Error: API '{api}' is missing required "
-            f"'module' or 'method' field[/red]"
+            f"[red]Error: API '{name}' is missing 'module' or 'method'[/red]"
         )
         raise typer.Exit(1)
 
-    err_console.print(f"[blue]Fetching API '{api}' to introspect response...[/blue]")
+    result = introspect_and_generate(
+        module,
+        client_class,
+        method,
+        url,
+        params,
+        init_params,
+        f"{name}_serializer",
+        user_defaults,
+    )
+    print(result)
 
-    try:
-        result = introspect_and_generate(
-            module,
-            client_class,
-            method,
-            url,
-            params,
-            init_params,
-            f"{api}_serializer",
-            user_defaults,
+
+def _generate_post_processor_serializer(
+    pp_config: dict[str, Any], config_data: dict[str, Any]
+) -> None:
+    name = pp_config["name"]
+    module = pp_config.get("module")
+    class_name = pp_config.get("class")
+    method = pp_config.get("method", "")
+    inputs = pp_config.get("inputs", [])
+
+    if not module or not class_name or not inputs:
+        err_console.print(
+            f"[red]Error: Post-processor '{name}' is missing 'module', "
+            "'class', or 'inputs'[/red]"
         )
-        print(result)
-    except Exception as e:
-        err_console.print(f"[red]Error generating serializer: {e}[/red]")
-        raise typer.Exit(1) from e
+        raise typer.Exit(1)
+
+    apis = config_data.get("apis", [])
+    clients = config_data.get("clients", {})
+
+    input_configs = []
+    for input_name in inputs:
+        input_api = next((api for api in apis if api.get("name") == input_name), None)
+        if not input_api:
+            err_console.print(
+                f"[red]Error: Input API '{input_name}' not found in config[/red]"
+            )
+            raise typer.Exit(1)
+
+        module_name = input_api.get("module")
+        client_class_name = input_api.get("client_class", "Client")
+        init_params = input_api.get("init_params")
+
+        client_ref = input_api.get("client")
+        if client_ref and client_ref in clients:
+            client_config = clients[client_ref]
+            if not module_name:
+                module_name = client_config.get("module")
+            client_class_name = client_config.get("client_class", "Client")
+            init_params = client_config.get("init_params")
+
+        input_configs.append(
+            {
+                "module": module_name,
+                "client_class": client_class_name,
+                "method": input_api.get("method"),
+                "url": input_api.get("url"),
+                "params": input_api.get("params"),
+                "init_params": init_params,
+            }
+        )
+
+    result = introspect_post_processor_and_generate(
+        module, class_name, method, input_configs, f"{name}_serializer"
+    )
+    print(result)
 
 
 @app.command("gen-api")
