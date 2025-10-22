@@ -31,6 +31,12 @@ name = "mempool_blocks_fee"
 client = "mempool"
 method = "get_mempool_blocks_fee"
 
+[[apis]]
+name = "block_feerates"
+client = "mempool"
+method = "get_block_feerates"
+user_inputs = ["time_period"]
+
 [[post_processors]]
 name = "fee_analysis"
 module = "pymempool"

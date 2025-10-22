@@ -91,11 +91,118 @@ def resolve_serializer(
     return global_serializers.get(serializer_name, {})
 
 
+def _resolve_client_config(
+    api_config: dict[str, Any], client_configs: dict[str, Any]
+) -> tuple[Optional[str], str, Optional[str], dict[str, Any], Optional[str]]:
+    """
+    Resolve client configuration from API config and client configs.
+
+    Returns:
+        Tuple of (module_name, client_class_name, client_id, init_params,
+        init_method_name)
+    """
+    module_name = api_config.get("module")
+    client_ref = api_config.get("client")
+
+    if client_ref and client_ref in client_configs:
+        client_config = client_configs[client_ref]
+        if not module_name:
+            module_name = client_config.get("module")
+        client_class_name = client_config.get("client_class", "Client")
+        client_id = client_ref
+        init_params = client_config.get("init_params", {})
+        init_method_name = client_config.get("init_method")
+    else:
+        client_class_name = api_config.get("client_class", "Client")
+        client_id = None
+        init_params = api_config.get("init_params", {})
+        init_method_name = None
+
+    return module_name, client_class_name, client_id, init_params, init_method_name
+
+
+def _get_or_create_client(
+    module: Any,
+    client_class_name: str,
+    client_id: Optional[str],
+    init_params: dict[str, Any],
+    init_method_name: Optional[str],
+    shared_clients: dict[str, Any],
+) -> Any:
+    """
+    Get an existing client from shared_clients or create a new one.
+
+    Returns:
+        Client instance
+    """
+    if client_id and client_id in shared_clients:
+        return shared_clients[client_id]
+
+    client_class = getattr(module, client_class_name)
+
+    if init_params:
+        client = client_class(**init_params)
+    else:
+        client = client_class()
+
+    if init_method_name:
+        init_method = getattr(client, init_method_name)
+        init_method()
+
+    if client_id:
+        shared_clients[client_id] = client
+
+    return client
+
+
+def _prepare_method_arguments(
+    method: Any,
+    url: str,
+    params: dict[str, Any],
+    user_inputs: list[str],
+    user_params: dict[str, str],
+) -> tuple[list, dict]:
+    """
+    Prepare arguments and kwargs for the API method call.
+
+    Returns:
+        Tuple of (method_args, method_kwargs)
+    """
+    sig = inspect.signature(method)
+    param_names = list(sig.parameters.keys())
+
+    method_args = []
+    method_kwargs = {}
+
+    if user_inputs:
+        for user_input in user_inputs:
+            if user_input in user_params:
+                value = user_params[user_input]
+                try:
+                    if value.isdigit():
+                        value = int(value)
+                    elif value.replace(".", "", 1).isdigit():
+                        value = float(value)
+                except (AttributeError, ValueError):
+                    pass
+
+                method_args.append(value)
+    elif "params" in param_names:
+        method_kwargs["params"] = params
+        if url:
+            method_args.append(url)
+    elif len(param_names) >= 1 and url:
+        method_args.append(url)
+
+    return method_args, method_kwargs
+
+
 def fetch_api_data(
     api_config: dict[str, Any],
     global_serializers: Optional[dict[str, Any]] = None,
     shared_clients: Optional[dict[str, Any]] = None,
     client_configs: Optional[dict[str, Any]] = None,
+    user_params: Optional[dict[str, str]] = None,
 ) -> Any:
     """
     Fetch data from an API endpoint based on configuration.
@@ -113,10 +220,12 @@ def fetch_api_data(
             - init_params: Params for client initialization (optional)
             - url: URL parameter to pass to method (optional)
             - params: Additional parameters for method (optional)
+            - user_inputs: List of required user parameter names (optional)
             - serializer: Serializer config or reference (optional)
         global_serializers: Named serializer configurations
         shared_clients: Dict to store/retrieve shared client instances
         client_configs: Dict of named client configurations
+        user_params: Dict of user-provided runtime parameters
 
     Returns:
         Serialized API response data, or error dict if fetch failed
@@ -134,25 +243,19 @@ def fetch_api_data(
         shared_clients = {}
     if client_configs is None:
         client_configs = {}
+    if user_params is None:
+        user_params = {}
 
     try:
-        module_name = api_config.get("module")
         method_name = api_config.get("method")
 
-        client_ref = api_config.get("client")
-        if client_ref and client_ref in client_configs:
-            client_config = client_configs[client_ref]
-            if not module_name:
-                module_name = client_config.get("module")
-            client_class_name = client_config.get("client_class", "Client")
-            client_id = client_ref
-            init_params = client_config.get("init_params", {})
-            init_method_name = client_config.get("init_method")
-        else:
-            client_class_name = api_config.get("client_class", "Client")
-            client_id = None
-            init_params = api_config.get("init_params", {})
-            init_method_name = None
+        (
+            module_name,
+            client_class_name,
+            client_id,
+            init_params,
+            init_method_name,
+        ) = _resolve_client_config(api_config, client_configs)
 
         if not module_name:
             return {"error": "No module specified"}
@@ -162,38 +265,28 @@ def fetch_api_data(
 
         module = importlib.import_module(module_name)
 
-        if client_id and client_id in shared_clients:
-            client = shared_clients[client_id]
-        else:
-            client_class = getattr(module, client_class_name)
-
-            if init_params:
-                client = client_class(**init_params)
-            else:
-                client = client_class()
-
-            if init_method_name:
-                init_method = getattr(client, init_method_name)
-                init_method()
-
-            if client_id:
-                shared_clients[client_id] = client
+        client = _get_or_create_client(
+            module,
+            client_class_name,
+            client_id,
+            init_params,
+            init_method_name,
+            shared_clients,
+        )
 
         method = getattr(client, method_name)
 
         url = api_config.get("url", "")
         params = api_config.get("params", {})
+        user_inputs = api_config.get("user_inputs", [])
 
-        sig = inspect.signature(method)
-        param_names = list(sig.parameters.keys())
+        method_args, method_kwargs = _prepare_method_arguments(
+            method, url, params, user_inputs, user_params
+        )
 
-        if "params" in param_names:
-            responses = method(url, params=params)
-        elif len(param_names) >= 1:
-            responses = method(url)
-        else:
-            responses = method()
+        responses = method(*method_args, **method_kwargs)
 
+        client_ref = api_config.get("client")
         serializer_config = resolve_serializer(
             api_config, global_serializers, client_ref=client_ref
         )
@@ -325,18 +418,24 @@ class ApiClient:
         >>> successful = client.get_successful_results()
     """
 
-    def __init__(self, config_paths: Union[str, Path, list[Union[str, Path]]]):
+    def __init__(
+        self,
+        config_paths: Union[str, Path, list[Union[str, Path]]],
+        user_params: Optional[dict[str, str]] = None,
+    ):
         """
         Initialize ApiClient with one or more configuration files.
 
         Args:
             config_paths: Single path or list of paths to TOML configuration files.
                          All configs are loaded and merged during initialization.
+            user_params: Optional dict of user-provided runtime parameters
         """
         if isinstance(config_paths, (str, Path)):
             config_paths = [config_paths]
 
         self.config_paths = [Path(p) for p in config_paths]
+        self.user_params = user_params or {}
 
         self.apis = []
         self.serializers = {}
@@ -389,12 +488,27 @@ class ApiClient:
 
         for api_config in self.apis:
             api_name = api_config.get("name", "unknown")
+
+            required_inputs = api_config.get("user_inputs", [])
+            if required_inputs:
+                missing = [
+                    inp for inp in required_inputs if inp not in self.user_params
+                ]
+                if missing:
+                    self.status[api_name] = {
+                        "success": False,
+                        "error": f"Missing required parameter(s): {', '.join(missing)}",
+                        "timestamp": time.time(),
+                    }
+                    continue
+
             try:
                 result = fetch_api_data(
                     api_config,
                     global_serializers=self.serializers,
                     shared_clients=self.shared_clients,
                     client_configs=self.clients,
+                    user_params=self.user_params,
                 )
 
                 has_error = isinstance(result, dict) and "error" in result

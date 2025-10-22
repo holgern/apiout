@@ -186,6 +186,48 @@ The tool follows the XDG Base Directory specification:
 
 See `examples/env_mempool.toml` and `examples/env_btcprice.toml` for complete examples.
 
+### 5. User Parameters
+
+Some APIs require runtime parameters that shouldn't be hardcoded in configuration files.
+Use the `-p`/`--param` flag to provide these values:
+
+**Configuration:**
+
+```toml
+[clients.mempool]
+module = "pymempool"
+client_class = "MempoolAPI"
+init_params = {api_base_url = "https://mempool.space/api/"}
+
+[[apis]]
+name = "block_feerates"
+client = "mempool"
+method = "get_block_feerates"
+user_inputs = ["time_period"]  # Declare required parameters
+```
+
+**Usage:**
+
+```bash
+# Single parameter
+apiout run -c config.toml -p time_period=24h --json
+
+# Multiple parameters
+apiout run -c config.toml -p param1=value1 -p param2=value2 --json
+
+# Combine with environments
+apiout run -e mempool -p time_period=1w --json
+```
+
+**Features:**
+
+- **Type coercion**: String values are automatically converted to `int` or `float` when
+  possible (`"42"` → `42`, `"3.14"` → `3.14`)
+- **Validation**: APIs with missing required parameters are skipped with a warning
+- **Multiple parameters**: Support for APIs requiring multiple user inputs
+- **Order matters**: Parameters are passed to methods in the order listed in
+  `user_inputs`
+
 ## CLI Commands
 
 ### `run` - Fetch API Data
@@ -212,6 +254,7 @@ apiout run -e <env1> -e <env2> -c <config.toml> [--json]
   times)
 - `-s, --serializers`: Path to serializers configuration file (optional, can be
   specified multiple times)
+- `-p, --param`: User parameter in format `key=value` (can be specified multiple times)
 - `--json`: Output as JSON format (default: pretty-printed)
 
 **Using JSON Input from stdin:**

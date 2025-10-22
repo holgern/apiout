@@ -362,6 +362,34 @@ def generate_from_config_cmd(
         console.print(combined_output)
 
 
+def _parse_params(param_list: list[str]) -> dict[str, str]:
+    """
+    Parse list of key=value parameter strings into a dict.
+
+    Args:
+        param_list: List of strings in format "key=value"
+
+    Returns:
+        Dict mapping parameter names to values
+
+    Raises:
+        typer.Exit if any parameter is malformed
+    """
+    params = {}
+    for param in param_list:
+        if "=" not in param:
+            err_console.print(
+                f"[red]Error: Invalid parameter format '{param}'. "
+                f"Expected format: key=value[/red]"
+            )
+            raise typer.Exit(1)
+
+        key, value = param.split("=", 1)
+        params[key.strip()] = value.strip()
+
+    return params
+
+
 @app.command("run", help="Run API fetcher with config file")
 def main(
     env: list[str] = typer.Option(
@@ -383,6 +411,12 @@ def main(
         "--serializers",
         help="Path to serializers TOML configuration file "
         "(can be specified multiple times)",
+    ),
+    params: list[str] = typer.Option(
+        None,
+        "-p",
+        "--param",
+        help="User parameter in format key=value (can be specified multiple times)",
     ),
     json_output: bool = typer.Option(False, "--json", help="Output as JSON format"),
 ) -> None:
@@ -431,6 +465,8 @@ def main(
     if serializers:
         global_serializers.update(_load_serializer_files(serializers))
 
+    user_params = _parse_params(params) if params else {}
+
     shared_clients: dict[str, Any] = {}
     client_configs = config_data.get("clients", {})
     results = {}
@@ -440,8 +476,19 @@ def main(
             raise typer.Exit(1)
 
         name = api["name"]
+
+        required_inputs = api.get("user_inputs", [])
+        if required_inputs:
+            missing = [inp for inp in required_inputs if inp not in user_params]
+            if missing:
+                err_console.print(
+                    f"[yellow]Warning: Skipping '{name}' - missing required "
+                    f"parameter(s): {', '.join(missing)}[/yellow]"
+                )
+                continue
+
         results[name] = fetch_api_data(
-            api, global_serializers, shared_clients, client_configs
+            api, global_serializers, shared_clients, client_configs, user_params
         )
 
     post_processors = config_data.get("post_processors", [])
