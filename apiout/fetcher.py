@@ -161,6 +161,7 @@ def _prepare_method_arguments(
     params: dict[str, Any],
     user_inputs: list[str],
     user_params: dict[str, str],
+    user_defaults: dict[str, Any],
 ) -> tuple[list, dict]:
     """
     Prepare arguments and kwargs for the API method call.
@@ -178,15 +179,21 @@ def _prepare_method_arguments(
         for user_input in user_inputs:
             if user_input in user_params:
                 value = user_params[user_input]
-                try:
+            elif user_input in user_defaults:
+                value = user_defaults[user_input]
+            else:
+                continue
+
+            try:
+                if isinstance(value, str):
                     if value.isdigit():
                         value = int(value)
                     elif value.replace(".", "", 1).isdigit():
                         value = float(value)
-                except (AttributeError, ValueError):
-                    pass
+            except (AttributeError, ValueError):
+                pass
 
-                method_args.append(value)
+            method_args.append(value)
     elif "params" in param_names:
         method_kwargs["params"] = params
         if url:
@@ -221,6 +228,7 @@ def fetch_api_data(
             - url: URL parameter to pass to method (optional)
             - params: Additional parameters for method (optional)
             - user_inputs: List of required user parameter names (optional)
+            - user_defaults: Default values for user inputs (optional)
             - serializer: Serializer config or reference (optional)
         global_serializers: Named serializer configurations
         shared_clients: Dict to store/retrieve shared client instances
@@ -279,9 +287,10 @@ def fetch_api_data(
         url = api_config.get("url", "")
         params = api_config.get("params", {})
         user_inputs = api_config.get("user_inputs", [])
+        user_defaults = api_config.get("user_defaults", {})
 
         method_args, method_kwargs = _prepare_method_arguments(
-            method, url, params, user_inputs, user_params
+            method, url, params, user_inputs, user_params, user_defaults
         )
 
         responses = method(*method_args, **method_kwargs)
@@ -491,8 +500,11 @@ class ApiClient:
 
             required_inputs = api_config.get("user_inputs", [])
             if required_inputs:
+                user_defaults = api_config.get("user_defaults", {})
                 missing = [
-                    inp for inp in required_inputs if inp not in self.user_params
+                    inp
+                    for inp in required_inputs
+                    if inp not in self.user_params and inp not in user_defaults
                 ]
                 if missing:
                     self.status[api_name] = {

@@ -157,6 +157,50 @@ class TestFetchApiDataWithUserParams:
 
             assert result == "no_params"
 
+    def test_fetch_with_user_defaults(self):
+        class MockClient:
+            def test_method(self, param1):
+                return f"result_{param1}"
+
+        api_config = {
+            "module": "sys",
+            "client_class": "MockClient",
+            "method": "test_method",
+            "user_inputs": ["param1"],
+            "user_defaults": {"param1": "default_value"},
+        }
+
+        with patch("importlib.import_module") as mock_import:
+            mock_module = MagicMock()
+            mock_module.MockClient = MockClient
+            mock_import.return_value = mock_module
+
+            result = fetch_api_data(api_config, user_params={})
+
+            assert result == "result_default_value"
+
+    def test_fetch_with_user_defaults_override(self):
+        class MockClient:
+            def test_method(self, param1):
+                return f"result_{param1}"
+
+        api_config = {
+            "module": "sys",
+            "client_class": "MockClient",
+            "method": "test_method",
+            "user_inputs": ["param1"],
+            "user_defaults": {"param1": "default_value"},
+        }
+
+        with patch("importlib.import_module") as mock_import:
+            mock_module = MagicMock()
+            mock_module.MockClient = MockClient
+            mock_import.return_value = mock_module
+
+            result = fetch_api_data(api_config, user_params={"param1": "override"})
+
+            assert result == "result_override"
+
 
 class TestApiClientWithUserParams:
     def test_api_client_with_user_params(self):
@@ -264,6 +308,80 @@ user_inputs = ["param2"]
                 assert results["api1"] == "result1_value1"
                 assert "api2" not in results
                 assert client.status["api2"]["success"] is False
+        finally:
+            Path(config_path).unlink()
+
+    def test_api_client_with_user_defaults(self):
+        class MockClient:
+            def test_method(self, param1):
+                return f"result_{param1}"
+
+        config_content = """
+[clients.test]
+module = "sys"
+client_class = "MockClient"
+
+[[apis]]
+name = "test_api"
+client = "test"
+method = "test_method"
+user_inputs = ["param1"]
+user_defaults = {param1 = "default_value"}
+"""
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
+            f.write(config_content)
+            config_path = f.name
+
+        try:
+            with patch("importlib.import_module") as mock_import:
+                mock_module = MagicMock()
+                mock_module.MockClient = MockClient
+                mock_import.return_value = mock_module
+
+                client = ApiClient(config_path, user_params={})
+                results = client.fetch()
+
+                assert "test_api" in results
+                assert results["test_api"] == "result_default_value"
+                assert client.status["test_api"]["success"] is True
+        finally:
+            Path(config_path).unlink()
+
+    def test_api_client_user_param_overrides_default(self):
+        class MockClient:
+            def test_method(self, param1):
+                return f"result_{param1}"
+
+        config_content = """
+[clients.test]
+module = "sys"
+client_class = "MockClient"
+
+[[apis]]
+name = "test_api"
+client = "test"
+method = "test_method"
+user_inputs = ["param1"]
+user_defaults = {param1 = "default_value"}
+"""
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
+            f.write(config_content)
+            config_path = f.name
+
+        try:
+            with patch("importlib.import_module") as mock_import:
+                mock_module = MagicMock()
+                mock_module.MockClient = MockClient
+                mock_import.return_value = mock_module
+
+                client = ApiClient(config_path, user_params={"param1": "override"})
+                results = client.fetch()
+
+                assert "test_api" in results
+                assert results["test_api"] == "result_override"
+                assert client.status["test_api"]["success"] is True
         finally:
             Path(config_path).unlink()
 

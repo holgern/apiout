@@ -479,7 +479,12 @@ def main(
 
         required_inputs = api.get("user_inputs", [])
         if required_inputs:
-            missing = [inp for inp in required_inputs if inp not in user_params]
+            user_defaults = api.get("user_defaults", {})
+            missing = [
+                inp
+                for inp in required_inputs
+                if inp not in user_params and inp not in user_defaults
+            ]
             if missing:
                 err_console.print(
                     f"[yellow]Warning: Skipping '{name}' - missing required "
