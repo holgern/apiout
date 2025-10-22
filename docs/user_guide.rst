@@ -448,12 +448,45 @@ This is equivalent to:
 
 When both stdin and ``-p`` are provided, stdin parameters override ``-p`` parameters.
 
+**How it works:**
+
+* User parameters from stdin (or ``-p`` flags) are merged into the ``params`` dictionary
+* Parameters that already exist in ``params`` are overridden
+* New parameters not in the config are added to ``params``
+* Parameters in ``user_inputs`` are passed as method arguments (not merged into ``params``)
+
+**Example: Override params values**
+
+Configuration file (``api.toml``):
+
+.. code-block:: toml
+
+   [[apis]]
+   name = "docs_api"
+   module = "requests"
+   client_class = "Session"
+   method = "get"
+   url = "https://api.example.com/docs"
+
+   [apis.params]
+   topic = "default_topic"
+   tokens = 5000
+
+Override with stdin:
+
+.. code-block:: bash
+
+   echo '{"topic": "routing", "tokens": 100}' | apiout run -c api.toml
+
+This will send ``topic=routing`` and ``tokens=100`` instead of the defaults.
+
 **Benefits:**
 
 * Cleaner syntax for complex parameter values
 * Easy integration with JSON-based tools and scripts
 * Support for nested objects and arrays
 * No need to escape special characters
+* Override default parameter values without modifying config files
 
 **2. Full JSON Configuration via stdin**
 

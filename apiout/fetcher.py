@@ -10,6 +10,8 @@ This module provides functionality for:
 
 import importlib
 import inspect
+import os
+import re
 import sys
 import time
 from pathlib import Path
@@ -21,6 +23,41 @@ else:
     import tomli as tomllib  # type: ignore[import-not-found]
 
 from .serializer import serialize_response
+
+
+def _substitute_env_vars(value: Any) -> Any:
+    """
+    Recursively substitute environment variables in configuration values.
+
+    Supports ${VAR_NAME} syntax. If the environment variable is not set,
+    the placeholder is left unchanged.
+
+    Args:
+        value: Configuration value (can be str, dict, list, or other type)
+
+    Returns:
+        Value with environment variables substituted
+
+    Examples:
+        >>> os.environ["API_KEY"] = "secret123"
+        >>> _substitute_env_vars("Bearer ${API_KEY}")
+        'Bearer secret123'
+        >>> _substitute_env_vars({"auth": "${API_KEY}", "timeout": 30})
+        {'auth': 'secret123', 'timeout': 30}
+    """
+    if isinstance(value, str):
+        # Match ${VAR_NAME} patterns
+        def replacer(match):
+            var_name = match.group(1)
+            return os.environ.get(var_name, match.group(0))
+
+        return re.sub(r"\$\{([^}]+)\}", replacer, value)
+    elif isinstance(value, dict):
+        return {k: _substitute_env_vars(v) for k, v in value.items()}
+    elif isinstance(value, list):
+        return [_substitute_env_vars(item) for item in value]
+    else:
+        return value
 
 
 def resolve_serializer(
@@ -110,12 +147,12 @@ def _resolve_client_config(
             module_name = client_config.get("module")
         client_class_name = client_config.get("client_class", "Client")
         client_id = client_ref
-        init_params = client_config.get("init_params", {})
+        init_params = _substitute_env_vars(client_config.get("init_params", {}))
         init_method_name = client_config.get("init_method")
     else:
         client_class_name = api_config.get("client_class", "Client")
         client_id = None
-        init_params = api_config.get("init_params", {})
+        init_params = _substitute_env_vars(api_config.get("init_params", {}))
         init_method_name = None
 
     return module_name, client_class_name, client_id, init_params, init_method_name
@@ -159,6 +196,7 @@ def _prepare_method_arguments(
     method: Any,
     url: str,
     params: dict[str, Any],
+    headers: dict[str, Any],
     user_inputs: list[str],
     user_params: dict[str, str],
     user_defaults: dict[str, Any],
@@ -171,6 +209,9 @@ def _prepare_method_arguments(
     """
     sig = inspect.signature(method)
     param_names = list(sig.parameters.keys())
+    has_kwargs = any(
+        p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()
+    )
 
     method_args = []
     method_kwargs = {}
@@ -200,6 +241,13 @@ def _prepare_method_arguments(
             method_args.append(url)
     elif len(param_names) >= 1 and url:
         method_args.append(url)
+
+    # Add params and headers as kwargs if method accepts **kwargs
+    if has_kwargs:
+        if params:
+            method_kwargs["params"] = params
+        if headers:
+            method_kwargs["headers"] = headers
 
     return method_args, method_kwargs
 
@@ -284,13 +332,19 @@ def fetch_api_data(
 
         method = getattr(client, method_name)
 
-        url = api_config.get("url", "")
-        params = api_config.get("params", {})
+        url = _substitute_env_vars(api_config.get("url", ""))
+        params = _substitute_env_vars(api_config.get("params", {}))
+        headers = _substitute_env_vars(api_config.get("headers", {}))
         user_inputs = api_config.get("user_inputs", [])
         user_defaults = api_config.get("user_defaults", {})
 
+        if user_params and isinstance(params, dict):
+            for key, value in user_params.items():
+                if key in params or key not in user_inputs:
+                    params[key] = value
+
         method_args, method_kwargs = _prepare_method_arguments(
-            method, url, params, user_inputs, user_params, user_defaults
+            method, url, params, headers, user_inputs, user_params, user_defaults
         )
 
         responses = method(*method_args, **method_kwargs)

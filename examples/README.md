@@ -298,3 +298,89 @@ This is useful for:
 - Converting existing TOML configurations with tools like `taplo`
 - Dynamically generating configurations in scripts
 - Integration with JSON-based CI/CD workflows
+
+## Context7 API Example
+
+- **File**: `context7_docs.toml`
+- **Description**: Demonstrates fetching documentation from Context7 API with headers
+  and environment variable substitution
+
+This example shows how to:
+
+1. Use headers for API authentication
+2. Use environment variable substitution with `${VAR_NAME}` syntax
+3. Pass query parameters to HTTP requests
+
+### Running the Example
+
+```bash
+export CONTEXT7_API_KEY="your_api_key_here"
+apiout run -c examples/context7_docs.toml
+```
+
+### Configuration
+
+```toml
+[[apis]]
+name = "nextjs_ssr_docs"
+module = "requests"
+client_class = "Session"
+method = "get"
+url = "https://context7.com/api/v1/vercel/next.js"
+
+[apis.params]
+type = "json"
+topic = "ssr"
+tokens = 5000
+
+[apis.headers]
+Authorization = "Bearer ${CONTEXT7_API_KEY}"
+```
+
+### Features Used
+
+- **Headers**: The `[apis.headers]` section defines HTTP headers to send with the
+  request
+- **Params**: The `[apis.params]` section defines query parameters (appended to URL)
+- **Environment Variables**: `${CONTEXT7_API_KEY}` is automatically replaced with the
+  value from the environment variable
+
+### Environment Variable Substitution
+
+apiout supports `${VAR_NAME}` syntax for environment variable substitution in:
+
+- Headers (`[apis.headers]`)
+- Params (`[apis.params]`)
+- URLs (`url = "https://${HOST}/api"`)
+- Init params (`[apis.init_params]` or `[clients.name.init_params]`)
+
+If the environment variable is not set, the placeholder remains unchanged (e.g.,
+`${VAR_NAME}`).
+
+Example:
+
+```toml
+[[apis]]
+name = "my_api"
+module = "requests"
+method = "get"
+url = "https://${API_HOST}/v1/data"
+
+[apis.params]
+api_key = "${API_KEY}"
+user = "${USER_ID}"
+
+[apis.headers]
+Authorization = "Bearer ${AUTH_TOKEN}"
+X-Custom-Header = "${CUSTOM_VALUE}"
+```
+
+Then run:
+
+```bash
+export API_HOST="api.example.com"
+export API_KEY="secret123"
+export AUTH_TOKEN="token456"
+export USER_ID="user789"
+apiout run -c config.toml
+```

@@ -1,3 +1,5 @@
+from collections.abc import Mapping
+
 from apiout.serializer import (
     apply_field_mapping,
     call_method_or_attr,
@@ -216,3 +218,41 @@ def test_call_method_or_attr_with_dict():
     assert call_method_or_attr(data, "key1") == "value1"
     assert call_method_or_attr(data, "key2") == 42
     assert call_method_or_attr(data, "missing") is None
+
+
+class MockMapping(Mapping):
+    """Mock Mapping class to test non-dict Mapping objects
+    (like CaseInsensitiveDict)."""
+
+    def __init__(self, data):
+        self._data = data
+
+    def __getitem__(self, key):
+        return self._data[key]
+
+    def __iter__(self):
+        return iter(self._data)
+
+    def __len__(self):
+        return len(self._data)
+
+
+def test_serialize_value_mapping_object():
+    """Test that Mapping objects (like requests.structures.CaseInsensitiveDict)
+    are serialized."""
+    mapping = MockMapping(
+        {"Content-Type": "application/json", "Authorization": "Bearer token123"}
+    )
+    result = serialize_value(mapping)
+    assert result == {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer token123",
+    }
+
+
+def test_call_method_or_attr_with_mapping():
+    """Test that Mapping objects work with call_method_or_attr."""
+    mapping = MockMapping({"key1": "value1", "key2": 42})
+    assert call_method_or_attr(mapping, "key1") == "value1"
+    assert call_method_or_attr(mapping, "key2") == 42
+    assert call_method_or_attr(mapping, "missing") is None

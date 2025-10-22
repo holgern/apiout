@@ -1,4 +1,5 @@
 import json
+from collections.abc import Mapping
 from typing import Any
 
 
@@ -8,6 +9,8 @@ def serialize_value(obj: Any) -> Any:
     elif isinstance(obj, (list, tuple)):
         return [serialize_value(item) for item in obj]
     elif isinstance(obj, dict):
+        return {k: serialize_value(v) for k, v in obj.items()}
+    elif isinstance(obj, Mapping):
         return {k: serialize_value(v) for k, v in obj.items()}
     elif hasattr(obj, "__dict__") and obj.__dict__:
         result = {}
@@ -25,6 +28,8 @@ def serialize_value(obj: Any) -> Any:
 
 def call_method_or_attr(obj: Any, name: str) -> Any:
     if isinstance(obj, dict):
+        return obj.get(name)
+    elif isinstance(obj, Mapping):
         return obj.get(name)
 
     attr = getattr(obj, name)
