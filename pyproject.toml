@@ -10,8 +10,8 @@ name = "apiout"
 authors = [
   { name="Holger Nahrstaedt", email="nahrstaedt@gmail.com" },
 ]
-description = "generates text from generators and provides as grid"
-keywords = ["api", "json"]
+description = "A flexible Python tool for fetching data from APIs and serializing responses using TOML configuration files"
+keywords = ["api", "json", "toml", "serialization", "cli", "http", "rest"]
 urls = { Homepage = "https://github.com/holgern/apiout" }
 readme = "README.md"
 requires-python = ">3.8.0"
