@@ -430,7 +430,34 @@ This outputs a TOML serializer configuration that you can refine manually.
 JSON Input
 ~~~~~~~~~~
 
-Instead of using TOML configuration files, you can provide JSON configuration via stdin:
+apiout supports two ways to use JSON with stdin:
+
+**1. JSON Parameters via stdin**
+
+Pass user parameters as JSON via stdin (works with ``-c`` or ``-e``):
+
+.. code-block:: bash
+
+   echo '{"time_period": "24h"}' | apiout run -c config.toml
+
+This is equivalent to:
+
+.. code-block:: bash
+
+   apiout run -c config.toml -p time_period=24h
+
+When both stdin and ``-p`` are provided, stdin parameters override ``-p`` parameters.
+
+**Benefits:**
+
+* Cleaner syntax for complex parameter values
+* Easy integration with JSON-based tools and scripts
+* Support for nested objects and arrays
+* No need to escape special characters
+
+**2. Full JSON Configuration via stdin**
+
+Provide the entire configuration as JSON (without ``-c`` or ``-e``):
 
 .. code-block:: bash
 

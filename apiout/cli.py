@@ -658,11 +658,9 @@ def main(
     ),
     json_output: bool = typer.Option(False, "--json", help="Output as JSON format"),
 ) -> None:
-    # Auto-detect JSON input from stdin
     has_stdin = not sys.stdin.isatty()
 
     if has_stdin and not config and not env:
-        # Read from stdin as JSON
         try:
             stdin_data = sys.stdin.read()
             config_data = json.loads(stdin_data)
@@ -670,20 +668,16 @@ def main(
             err_console.print(f"[red]Error: Invalid JSON from stdin: {e}[/red]")
             raise typer.Exit(1) from e
     else:
-        # Build list of config files from environments and explicit configs
         all_config_files: list[Path] = []
 
-        # Load environment files first
         if env:
             for env_name in env:
                 env_file = _load_env_file(env_name)
                 all_config_files.append(env_file)
 
-        # Add explicit config files
         if config:
             all_config_files.extend(config)
 
-        # Check if we have any config sources
         if not all_config_files:
             err_console.print(
                 "[red]Error: At least one of --env, --config must be provided "
@@ -704,6 +698,21 @@ def main(
         global_serializers.update(_load_serializer_files(serializers))
 
     user_params = _parse_params(params) if params else {}
+
+    if has_stdin and (config or env):
+        try:
+            stdin_data = sys.stdin.read()
+            if stdin_data.strip():
+                stdin_params = json.loads(stdin_data)
+                if not isinstance(stdin_params, dict):
+                    err_console.print(
+                        "[red]Error: stdin JSON must be an object/dict[/red]"
+                    )
+                    raise typer.Exit(1)
+                user_params.update(stdin_params)
+        except json.JSONDecodeError as e:
+            err_console.print(f"[red]Error: Invalid JSON from stdin: {e}[/red]")
+            raise typer.Exit(1) from e
 
     shared_clients: dict[str, Any] = {}
     client_configs = config_data.get("clients", {})
