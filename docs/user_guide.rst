@@ -510,6 +510,35 @@ Override client initialization parameters:
 When ``init_params`` are overridden, apiout creates a new client instance with the updated parameters.
 This allows runtime customization without modifying configuration files.
 
+**Important: Interaction between user_inputs and init_params**
+
+When a parameter name appears in both ``init_params`` and ``user_inputs``, the behavior is:
+
+* The parameter in ``init_params`` is **NOT** overridden by user params
+* The user-provided value is passed as a method argument instead
+* This allows the client to maintain its initialization state while the method receives different values
+
+**Example:**
+
+.. code-block:: toml
+
+   [clients.example]
+   module = "mymodule"
+   client_class = "Client"
+   init_params = {fiat = "EUR"}
+
+   [[apis]]
+   client = "example"
+   method = "get_data"
+   user_inputs = ["fiat"]
+
+Running with ``apiout run -c config.toml -p fiat=USD``:
+
+* Client is initialized with ``fiat="EUR"`` (from init_params)
+* Method is called as ``get_data("USD")`` (from user params)
+
+If you want user params to override ``init_params``, do **not** include that parameter in ``user_inputs``.
+
 **Benefits:**
 
 * Cleaner syntax for complex parameter values

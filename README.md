@@ -1,3 +1,8 @@
+[![PyPI - Version](https://img.shields.io/pypi/v/apiout)](https://pypi.org/project/apiout/)
+![PyPI - Python Version](https://img.shields.io/pypi/pyversions/apiout)
+![PyPI - Downloads](https://img.shields.io/pypi/dm/apiout)
+[![codecov](https://codecov.io/gh/holgern/apiout/graph/badge.svg?token=AtcFpVooWk)](https://codecov.io/gh/holgern/apiout)
+
 # apiout
 
 A flexible Python tool for fetching data from APIs and serializing responses using TOML
