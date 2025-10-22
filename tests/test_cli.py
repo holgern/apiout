@@ -342,3 +342,323 @@ field1 = "Value1"
     serializers_arg = calls[0][0][1]
     assert "ser1" in serializers_arg
     assert "ser2" in serializers_arg
+
+
+def test_gen_api_with_client_ref():
+    result = runner.invoke(
+        app,
+        [
+            "gen-api",
+            "--module",
+            "pymempool",
+            "--client-class",
+            "MempoolAPI",
+            "--client",
+            "mempool",
+            "--method",
+            "get_block_tip_hash",
+            "--name",
+            "block_tip_hash",
+        ],
+    )
+    assert result.exit_code == 0
+    assert "[clients.mempool]" in result.stdout
+    assert 'module = "pymempool"' in result.stdout
+    assert 'client_class = "MempoolAPI"' in result.stdout
+    assert "[[apis]]" in result.stdout
+    assert 'name = "block_tip_hash"' in result.stdout
+    assert 'client = "mempool"' in result.stdout
+    assert 'method = "get_block_tip_hash"' in result.stdout
+
+
+def test_gen_api_without_client_ref():
+    result = runner.invoke(
+        app,
+        [
+            "gen-api",
+            "--module",
+            "pymempool",
+            "--client-class",
+            "MempoolAPI",
+            "--method",
+            "get_block_tip_hash",
+            "--name",
+            "block_tip_hash",
+        ],
+    )
+    assert result.exit_code == 0
+    assert "[clients." not in result.stdout
+    assert "[[apis]]" in result.stdout
+    assert 'name = "block_tip_hash"' in result.stdout
+    assert 'module = "pymempool"' in result.stdout
+    assert 'client_class = "MempoolAPI"' in result.stdout
+    assert 'method = "get_block_tip_hash"' in result.stdout
+
+
+def test_gen_api_with_init_params():
+    result = runner.invoke(
+        app,
+        [
+            "gen-api",
+            "--module",
+            "pymempool",
+            "--client-class",
+            "MempoolAPI",
+            "--client",
+            "mempool",
+            "--method",
+            "get_block_tip_hash",
+            "--name",
+            "block_tip_hash",
+            "--init-params",
+            '{"api_base_url": "https://mempool.space/api/"}',
+        ],
+    )
+    assert result.exit_code == 0
+    assert "[clients.mempool]" in result.stdout
+    assert (
+        'init_params = {"api_base_url": "https://mempool.space/api/"}' in result.stdout
+    )
+
+
+def test_gen_api_with_user_inputs():
+    result = runner.invoke(
+        app,
+        [
+            "gen-api",
+            "--module",
+            "pymempool",
+            "--client-class",
+            "MempoolAPI",
+            "--client",
+            "mempool",
+            "--method",
+            "get_block_feerates",
+            "--name",
+            "block_feerates",
+            "--user-inputs",
+            '["time_period"]',
+            "--user-defaults",
+            '{"time_period": "24h"}',
+        ],
+    )
+    assert result.exit_code == 0
+    assert 'user_inputs = ["time_period"]' in result.stdout
+    assert 'user_defaults = {"time_period": "24h"}' in result.stdout
+
+
+def test_gen_api_with_invalid_init_params():
+    result = runner.invoke(
+        app,
+        [
+            "gen-api",
+            "--module",
+            "pymempool",
+            "--client-class",
+            "MempoolAPI",
+            "--client",
+            "mempool",
+            "--method",
+            "get_block_tip_hash",
+            "--name",
+            "block_tip_hash",
+            "--init-params",
+            "invalid json",
+        ],
+    )
+    assert result.exit_code == 1
+    assert "Invalid JSON init_params" in result.output
+
+
+def test_gen_api_with_url_and_params():
+    result = runner.invoke(
+        app,
+        [
+            "gen-api",
+            "--module",
+            "openmeteo_requests",
+            "--client-class",
+            "Client",
+            "--method",
+            "weather_api",
+            "--name",
+            "berlin_weather",
+            "--url",
+            "https://api.open-meteo.com/v1/forecast",
+            "--params",
+            '{"latitude": 52.52, "longitude": 13.41}',
+        ],
+    )
+    assert result.exit_code == 0
+    assert 'url = "https://api.open-meteo.com/v1/forecast"' in result.stdout
+    assert "[apis.params]" in result.stdout
+    assert "latitude = 52.52" in result.stdout
+    assert "longitude = 13.41" in result.stdout
+
+
+def test_gen_serializer_requires_config_or_env():
+    result = runner.invoke(app, ["gen-serializer", "--api", "test_api"])
+    assert result.exit_code == 1
+    assert "Either --config or --env must be specified" in result.output
+
+
+def test_gen_serializer_with_config(tmp_path, monkeypatch):
+    from unittest.mock import Mock
+
+    mock_introspect = Mock(
+        return_value="[serializers.test_api_serializer]\n[serializers.test_api_serializer.fields]\nvalue = 'data'"
+    )
+    monkeypatch.setattr("apiout.cli.introspect_and_generate", mock_introspect)
+
+    config_file = tmp_path / "config.toml"
+    config_file.write_text(
+        """
+[[apis]]
+name = "test_api"
+module = "test_module"
+client_class = "TestClient"
+method = "get_data"
+"""
+    )
+
+    result = runner.invoke(
+        app, ["gen-serializer", "--config", str(config_file), "--api", "test_api"]
+    )
+    assert result.exit_code == 0
+    assert "[serializers.test_api_serializer]" in result.stdout
+    mock_introspect.assert_called_once_with(
+        "test_module",
+        "TestClient",
+        "get_data",
+        None,
+        None,
+        None,
+        "test_api_serializer",
+        None,
+    )
+
+
+def test_gen_serializer_with_client_ref(tmp_path, monkeypatch):
+    from unittest.mock import Mock
+
+    mock_introspect = Mock(
+        return_value="[serializers.mempool_api_serializer]\n[serializers.mempool_api_serializer.fields]\nhash = 'hash'"
+    )
+    monkeypatch.setattr("apiout.cli.introspect_and_generate", mock_introspect)
+
+    config_file = tmp_path / "config.toml"
+    config_file.write_text(
+        """
+[clients.mempool]
+module = "pymempool"
+client_class = "MempoolAPI"
+init_params = {api_base_url = "https://mempool.space/api/"}
+
+[[apis]]
+name = "mempool_api"
+client = "mempool"
+method = "get_block_tip_hash"
+"""
+    )
+
+    result = runner.invoke(
+        app, ["gen-serializer", "--config", str(config_file), "--api", "mempool_api"]
+    )
+    assert result.exit_code == 0
+    assert "[serializers.mempool_api_serializer]" in result.stdout
+    mock_introspect.assert_called_once_with(
+        "pymempool",
+        "MempoolAPI",
+        "get_block_tip_hash",
+        None,
+        None,
+        {"api_base_url": "https://mempool.space/api/"},
+        "mempool_api_serializer",
+        None,
+    )
+
+
+def test_gen_serializer_api_not_found(tmp_path):
+    config_file = tmp_path / "config.toml"
+    config_file.write_text(
+        """
+[[apis]]
+name = "other_api"
+module = "test"
+method = "test"
+"""
+    )
+
+    result = runner.invoke(
+        app, ["gen-serializer", "--config", str(config_file), "--api", "missing_api"]
+    )
+    assert result.exit_code == 1
+    assert "API 'missing_api' not found" in result.output
+    assert "Available APIs: other_api" in result.output
+
+
+def test_gen_serializer_missing_module_or_method(tmp_path):
+    config_file = tmp_path / "config.toml"
+    config_file.write_text(
+        """
+[[apis]]
+name = "incomplete_api"
+module = "test_module"
+"""
+    )
+
+    result = runner.invoke(
+        app,
+        ["gen-serializer", "--config", str(config_file), "--api", "incomplete_api"],
+    )
+    assert result.exit_code == 1
+    assert "missing required 'module' or 'method' field" in result.output
+
+
+def test_gen_serializer_no_apis_section(tmp_path):
+    config_file = tmp_path / "config.toml"
+    config_file.write_text("[other]\nkey = 'value'")
+
+    result = runner.invoke(
+        app, ["gen-serializer", "--config", str(config_file), "--api", "test"]
+    )
+    assert result.exit_code == 1
+    assert "No 'apis' section found" in result.output
+
+
+def test_gen_serializer_with_user_defaults(tmp_path, monkeypatch):
+    from unittest.mock import Mock
+
+    mock_introspect = Mock(
+        return_value="[serializers.test_api_serializer]\n[serializers.test_api_serializer.fields]\nvalue = 'data'"
+    )
+    monkeypatch.setattr("apiout.cli.introspect_and_generate", mock_introspect)
+
+    config_file = tmp_path / "config.toml"
+    config_file.write_text(
+        """
+[[apis]]
+name = "test_api"
+module = "test_module"
+client_class = "TestClient"
+method = "get_data"
+user_inputs = ["time_period"]
+user_defaults = {time_period = "24h"}
+"""
+    )
+
+    result = runner.invoke(
+        app, ["gen-serializer", "--config", str(config_file), "--api", "test_api"]
+    )
+    assert result.exit_code == 0
+    assert "[serializers.test_api_serializer]" in result.stdout
+    mock_introspect.assert_called_once_with(
+        "test_module",
+        "TestClient",
+        "get_data",
+        None,
+        None,
+        None,
+        "test_api_serializer",
+        {"time_period": "24h"},
+    )

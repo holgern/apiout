@@ -297,28 +297,85 @@ The JSON format matches the TOML structure:
 }
 ```
 
-### `generate` - Generate Serializer Config
+### `gen-api` - Generate API Config
 
-Introspect an API response and generate a serializer configuration:
+Generate an API configuration TOML snippet:
 
 ```bash
-apiout generate \
-  --module openmeteo_requests \
-  --client-class Client \
-  --method weather_api \
-  --url "https://api.open-meteo.com/v1/forecast" \
-  --params '{"latitude": 52.52, "longitude": 13.41, "current": ["temperature_2m"]}' \
-  --name openmeteo
+apiout gen-api \
+  --module pymempool \
+  --client-class MempoolAPI \
+  --client mempool \
+  --method get_block_tip_hash \
+  --name block_tip_hash \
+  --init-params '{"api_base_url": "https://mempool.space/api/"}'
 ```
 
 **Options:**
 
 - `-m, --module`: Python module name (required)
-- `-c, --client-class`: Client class name (default: "Client")
+- `--client-class`: Client class name (default: "Client")
 - `--method`: Method name to call (required)
-- `-u, --url`: API URL (required)
-- `-p, --params`: JSON params dict (default: "{}")
-- `-n, --name`: Serializer name (default: "generated")
+- `-n, --name`: API name (required)
+- `--client`: Client reference name (optional: generates `[clients.X]` section)
+- `--init-params`: JSON init params dict for client (optional)
+- `-u, --url`: API URL (optional)
+- `-p, --params`: JSON params dict (optional)
+- `--user-inputs`: JSON array of required user input parameter names (optional)
+- `--user-defaults`: JSON dict of default values for user inputs (optional)
+
+### `gen-serializer` - Generate Serializer Config
+
+Introspect an API response and generate a serializer configuration from an existing API config:
+
+```bash
+# Generate serializer from API config
+apiout gen-serializer --config examples/mempool_apis.toml --api block_tip_hash
+
+# Using environment
+apiout gen-serializer --env production --api recommended_fees
+```
+
+**Options:**
+
+- `-a, --api`: API name from config (required)
+- `-c, --config`: Config file(s) to load (can be specified multiple times)
+- `-e, --env`: Environment name to load
+
+**How it works:**
+
+1. Loads the config file(s) and finds the API definition by name
+2. Extracts all configuration details (module, client, method, url, params, init_params)
+3. Makes an actual API call using the configured client
+4. Introspects the response structure
+5. Generates a serializer TOML configuration
+
+**Example:**
+
+Given a config file `mempool.toml`:
+```toml
+[clients.mempool]
+module = "pymempool"
+client_class = "MempoolAPI"
+init_params = {api_base_url = "https://mempool.space/api/"}
+
+[[apis]]
+name = "block_tip_hash"
+client = "mempool"
+method = "get_block_tip_hash"
+```
+
+Running:
+```bash
+apiout gen-serializer --config mempool.toml --api block_tip_hash
+```
+
+Outputs:
+```toml
+[serializers.block_tip_hash_serializer]
+[serializers.block_tip_hash_serializer.fields]
+hash = "hash_value"
+```
 
 ## Configuration Format
 

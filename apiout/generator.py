@@ -247,6 +247,7 @@ def introspect_and_generate(
     params: Optional[dict[str, Any]] = None,
     init_params: Optional[dict[str, Any]] = None,
     serializer_name: str = "generated",
+    user_defaults: Optional[dict[str, Any]] = None,
 ) -> str:
     try:
         module = importlib.import_module(module_name)
@@ -262,12 +263,21 @@ def introspect_and_generate(
         sig = inspect.signature(method)
         method_params = list(sig.parameters.keys())
 
-        if url is not None and "params" in method_params:
-            response = method(url, params=params or {})
+        method_args = []
+        method_kwargs = {}
+
+        if user_defaults:
+            for value in user_defaults.values():
+                method_args.append(value)
+        elif url is not None and "params" in method_params:
+            method_args.append(url)
+            method_kwargs["params"] = params or {}
         elif url is not None and len(method_params) > 0:
-            response = method(url)
-        else:
-            response = method()
+            method_args.append(url)
+        elif params:
+            method_kwargs.update(params)
+
+        response = method(*method_args, **method_kwargs)
 
         if isinstance(response, list) and len(response) > 0:
             sample = response[0]
@@ -342,6 +352,69 @@ def introspect_and_generate(
 
     except Exception as e:
         return f"# Error generating serializer: {e}"
+
+
+def generate_api_toml(
+    name: str,
+    module_name: str,
+    client_class: str,
+    method_name: str,
+    client_ref: Optional[str] = None,
+    init_params: Optional[dict[str, Any]] = None,
+    url: Optional[str] = None,
+    params: Optional[dict[str, Any]] = None,
+    user_inputs: Optional[list[str]] = None,
+    user_defaults: Optional[dict[str, Any]] = None,
+) -> str:
+    lines = []
+
+    if client_ref:
+        lines.append(f"[clients.{client_ref}]")
+        lines.append(f'module = "{module_name}"')
+        lines.append(f'client_class = "{client_class}"')
+        if init_params:
+            init_params_str = str(init_params).replace("'", '"')
+            lines.append(f"init_params = {init_params_str}")
+        lines.append("")
+
+    lines.append("[[apis]]")
+    lines.append(f'name = "{name}"')
+
+    if client_ref:
+        lines.append(f'client = "{client_ref}"')
+    else:
+        lines.append(f'module = "{module_name}"')
+        lines.append(f'client_class = "{client_class}"')
+        if init_params:
+            init_params_str = str(init_params).replace("'", '"')
+            lines.append(f"init_params = {init_params_str}")
+
+    lines.append(f'method = "{method_name}"')
+
+    if url:
+        lines.append(f'url = "{url}"')
+
+    if params:
+        lines.append("")
+        lines.append("[apis.params]")
+        for key, value in params.items():
+            if isinstance(value, str):
+                lines.append(f'{key} = "{value}"')
+            elif isinstance(value, (list, dict)):
+                value_str = str(value).replace("'", '"')
+                lines.append(f"{key} = {value_str}")
+            else:
+                lines.append(f"{key} = {value}")
+
+    if user_inputs:
+        user_inputs_str = str(user_inputs).replace("'", '"')
+        lines.append(f"user_inputs = {user_inputs_str}")
+
+    if user_defaults:
+        user_defaults_str = str(user_defaults).replace("'", '"')
+        lines.append(f"user_defaults = {user_defaults_str}")
+
+    return "\n".join(lines)
 
 
 def introspect_post_processor_and_generate(

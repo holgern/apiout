@@ -2,6 +2,7 @@ from unittest.mock import MagicMock, patch
 
 from apiout.generator import (
     analyze_object,
+    generate_api_toml,
     generate_serializer_config,
     get_methods_and_attrs,
     introspect_and_generate,
@@ -287,3 +288,73 @@ def test_introspect_post_processor_and_generate():
     assert "[serializers.pp_serializer]" in result
     assert 'output = "output"' in result
     assert 'score = "score"' in result
+
+
+def test_generate_api_toml_with_client_ref():
+    from apiout.generator import generate_api_toml
+    
+    result = generate_api_toml(
+        name="block_tip_hash",
+        module_name="pymempool",
+        client_class="MempoolAPI",
+        method_name="get_block_tip_hash",
+        client_ref="mempool",
+    )
+    
+    assert "[clients.mempool]" in result
+    assert 'module = "pymempool"' in result
+    assert 'client_class = "MempoolAPI"' in result
+    assert "[[apis]]" in result
+    assert 'name = "block_tip_hash"' in result
+    assert 'client = "mempool"' in result
+    assert 'method = "get_block_tip_hash"' in result
+
+
+def test_generate_api_toml_without_client_ref():
+    from apiout.generator import generate_api_toml
+    
+    result = generate_api_toml(
+        name="block_tip_hash",
+        module_name="pymempool",
+        client_class="MempoolAPI",
+        method_name="get_block_tip_hash",
+    )
+    
+    assert "[clients." not in result
+    assert "[[apis]]" in result
+    assert 'name = "block_tip_hash"' in result
+    assert 'module = "pymempool"' in result
+    assert 'client_class = "MempoolAPI"' in result
+    assert 'method = "get_block_tip_hash"' in result
+
+
+def test_generate_api_toml_with_init_params():
+    from apiout.generator import generate_api_toml
+    
+    result = generate_api_toml(
+        name="block_tip_hash",
+        module_name="pymempool",
+        client_class="MempoolAPI",
+        method_name="get_block_tip_hash",
+        client_ref="mempool",
+        init_params={"api_base_url": "https://mempool.space/api/"},
+    )
+    
+    assert 'init_params = {"api_base_url": "https://mempool.space/api/"}' in result
+
+
+def test_generate_api_toml_with_user_inputs():
+    from apiout.generator import generate_api_toml
+    
+    result = generate_api_toml(
+        name="block_feerates",
+        module_name="pymempool",
+        client_class="MempoolAPI",
+        method_name="get_block_feerates",
+        client_ref="mempool",
+        user_inputs=["time_period"],
+        user_defaults={"time_period": "24h"},
+    )
+    
+    assert 'user_inputs = ["time_period"]' in result
+    assert 'user_defaults = {"time_period": "24h"}' in result

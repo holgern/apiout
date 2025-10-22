@@ -8,7 +8,11 @@ import typer
 from rich.console import Console
 
 from .fetcher import fetch_api_data, process_post_processor
-from .generator import introspect_and_generate, introspect_post_processor_and_generate
+from .generator import (
+    generate_api_toml,
+    introspect_and_generate,
+    introspect_post_processor_and_generate,
+)
 
 if sys.version_info >= (3, 11):
     import tomllib
@@ -75,28 +79,170 @@ def _load_env_file(env_name: str) -> Path:
     return env_file
 
 
-@app.command("generate")
-def generate_cmd(
-    module: str = typer.Option(..., "--module", "-m", help="Python module name"),
-    client_class: str = typer.Option(
-        "Client", "--client-class", "-c", help="Client class name"
+@app.command("gen-serializer")
+def gen_serializer_cmd(
+    api: str = typer.Option(..., "--api", "-a", help="API name from config"),
+    config: list[Path] = typer.Option(
+        None,
+        "-c",
+        "--config",
+        help="Config file(s) to load (can be specified multiple times)",
     ),
-    method: str = typer.Option(..., "--method", help="Method name to call"),
-    url: str = typer.Option(..., "--url", "-u", help="API URL"),
-    params: str = typer.Option("{}", "--params", "-p", help="JSON params dict"),
-    name: str = typer.Option("generated", "--name", "-n", help="Serializer name"),
+    env: str = typer.Option(None, "-e", "--env", help="Environment name to load"),
 ) -> None:
+    """Generate serializer config by introspecting API response from existing config."""
+    if not config and not env:
+        err_console.print(
+            "[red]Error: Either --config or --env must be specified[/red]"
+        )
+        raise typer.Exit(1)
+
+    config_paths = list(config) if config else []
+    if env:
+        env_file = _load_env_file(env)
+        config_paths.append(env_file)
+
+    config_data = _load_config_files(config_paths)
+
+    if not config_data.get("apis"):
+        err_console.print("[red]Error: No 'apis' section found in config[/red]")
+        raise typer.Exit(1)
+
+    api_config = None
+    for api_def in config_data["apis"]:
+        if api_def.get("name") == api:
+            api_config = api_def
+            break
+
+    if not api_config:
+        available = ", ".join(a.get("name", "unnamed") for a in config_data["apis"])
+        err_console.print(
+            f"[red]Error: API '{api}' not found in config. "
+            f"Available APIs: {available}[/red]"
+        )
+        raise typer.Exit(1)
+
+    module = api_config.get("module")
+    client_class = api_config.get("client_class", "Client")
+    method = api_config.get("method")
+    url = api_config.get("url")
+    params = api_config.get("params")
+    init_params = api_config.get("init_params")
+    user_defaults = api_config.get("user_defaults")
+
+    client_ref = api_config.get("client")
+    if client_ref and client_ref in config_data.get("clients", {}):
+        client_config = config_data["clients"][client_ref]
+        if not module:
+            module = client_config.get("module")
+        client_class = client_config.get("client_class", "Client")
+        init_params = client_config.get("init_params", {})
+
+    if not module or not method:
+        err_console.print(
+            f"[red]Error: API '{api}' is missing required "
+            f"'module' or 'method' field[/red]"
+        )
+        raise typer.Exit(1)
+
+    err_console.print(f"[blue]Fetching API '{api}' to introspect response...[/blue]")
+
     try:
-        params_dict = json.loads(params)
-    except json.JSONDecodeError as e:
-        err_console.print(f"[red]Error: Invalid JSON params: {e}[/red]")
+        result = introspect_and_generate(
+            module,
+            client_class,
+            method,
+            url,
+            params,
+            init_params,
+            f"{api}_serializer",
+            user_defaults,
+        )
+        print(result)
+    except Exception as e:
+        err_console.print(f"[red]Error generating serializer: {e}[/red]")
         raise typer.Exit(1) from e
 
-    result = introspect_and_generate(
-        module, client_class, method, url, params_dict, None, name
+
+@app.command("gen-api")
+def gen_api_cmd(
+    module: str = typer.Option(..., "--module", "-m", help="Python module name"),
+    client_class: str = typer.Option(
+        "Client", "--client-class", help="Client class name"
+    ),
+    method: str = typer.Option(..., "--method", help="Method name to call"),
+    name: str = typer.Option(..., "--name", "-n", help="API name"),
+    client: str = typer.Option(
+        None, "--client", help="Client reference name (generates [clients.X] section)"
+    ),
+    init_params: str = typer.Option(
+        None, "--init-params", help="JSON init params dict for client"
+    ),
+    url: str = typer.Option(None, "--url", "-u", help="API URL (optional)"),
+    params: str = typer.Option(
+        None, "--params", "-p", help="JSON params dict (optional)"
+    ),
+    user_inputs: str = typer.Option(
+        None, "--user-inputs", help="JSON array of required user input parameter names"
+    ),
+    user_defaults: str = typer.Option(
+        None, "--user-defaults", help="JSON dict of default values for user inputs"
+    ),
+) -> None:
+    init_params_dict = None
+    if init_params:
+        try:
+            init_params_dict = json.loads(init_params)
+        except json.JSONDecodeError as e:
+            err_console.print(f"[red]Error: Invalid JSON init_params: {e}[/red]")
+            raise typer.Exit(1) from e
+
+    params_dict = None
+    if params:
+        try:
+            params_dict = json.loads(params)
+        except json.JSONDecodeError as e:
+            err_console.print(f"[red]Error: Invalid JSON params: {e}[/red]")
+            raise typer.Exit(1) from e
+
+    user_inputs_list = None
+    if user_inputs:
+        try:
+            user_inputs_list = json.loads(user_inputs)
+            if not isinstance(user_inputs_list, list):
+                err_console.print("[red]Error: user_inputs must be a JSON array[/red]")
+                raise typer.Exit(1)
+        except json.JSONDecodeError as e:
+            err_console.print(f"[red]Error: Invalid JSON user_inputs: {e}[/red]")
+            raise typer.Exit(1) from e
+
+    user_defaults_dict = None
+    if user_defaults:
+        try:
+            user_defaults_dict = json.loads(user_defaults)
+            if not isinstance(user_defaults_dict, dict):
+                err_console.print(
+                    "[red]Error: user_defaults must be a JSON object[/red]"
+                )
+                raise typer.Exit(1)
+        except json.JSONDecodeError as e:
+            err_console.print(f"[red]Error: Invalid JSON user_defaults: {e}[/red]")
+            raise typer.Exit(1) from e
+
+    result = generate_api_toml(
+        name=name,
+        module_name=module,
+        client_class=client_class,
+        method_name=method,
+        client_ref=client,
+        init_params=init_params_dict,
+        url=url,
+        params=params_dict,
+        user_inputs=user_inputs_list,
+        user_defaults=user_defaults_dict,
     )
 
-    console.print(result)
+    print(result)
 
 
 def _flatten_serializers(serializers: dict[str, Any]) -> dict[str, Any]:
