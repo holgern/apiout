@@ -671,6 +671,164 @@ def _parse_params(param_list: list[str]) -> dict[str, str]:
     return params
 
 
+def _auto_generate_serializers(
+    apis: list[dict[str, Any]],
+    config_data: dict[str, Any],
+    global_serializers: dict[str, Any],
+    user_params: dict[str, str],
+    err_console: Console,
+    json_output: bool = False,
+) -> None:
+    """
+    Auto-generate serializers for APIs without explicit serializers.
+
+    Args:
+        apis: List of API configurations
+        config_data: Full configuration data containing clients
+        global_serializers: Global serializers dictionary to update
+        user_params: User-provided parameters
+        err_console: Console for error output
+        json_output: Whether to suppress console messages for JSON output
+    """
+    for api in apis:
+        api_name = api.get("name")
+        if not api_name:
+            continue
+
+        # Check if API already has a serializer
+        client_ref = api.get("client")
+        existing_serializer = resolve_serializer(api, global_serializers, client_ref)
+
+        if not existing_serializer:  # No existing serializer found
+            if not json_output:
+                err_console.print(
+                    f"[blue]Auto-generating serializer for '{api_name}'...[/blue]"
+                )
+            try:
+                # Generate serializer using the same logic as gen-serializer
+                module = api.get("module")
+                client_class = api.get("client_class", "Client")
+                method = api.get("method")
+                url = api.get("url")
+                api_params = api.get("params")
+                init_params = api.get("init_params")
+                method_params = api.get("method_params", {})
+                param_defaults = api.get("param_defaults", {})
+
+                client_ref = api.get("client")
+                if client_ref:
+                    clients = config_data.get("clients", {})
+                    if client_ref in clients:
+                        client_config = clients[client_ref]
+                        if not module:
+                            module = client_config.get("module")
+                        client_class = client_config.get("client_class", "Client")
+                        init_params = client_config.get("init_params", {})
+
+                if module and method:
+                    # Apply variable substitution using param_defaults
+                    url = _substitute_vars(
+                        url, method_params, user_params, param_defaults
+                    )
+                    api_params = _substitute_vars(
+                        api_params, method_params, user_params, param_defaults
+                    )
+                    init_params = _substitute_vars(
+                        init_params, method_params, user_params, param_defaults
+                    )
+
+                    # Generate the serializer configuration
+                    serializer_toml = introspect_and_generate(
+                        module,
+                        client_class,
+                        method,
+                        url,
+                        api_params,
+                        init_params,
+                        f"{api_name}_serializer",
+                        method_params,
+                    )
+
+                    # Parse the generated TOML and add to global_serializers
+                    if serializer_toml and not serializer_toml.startswith("# Error"):
+                        try:
+                            import io
+
+                            generated_config = tomllib.load(
+                                io.BytesIO(serializer_toml.encode())
+                            )
+                            if "serializers" in generated_config:
+                                flattened = _flatten_serializers(
+                                    generated_config["serializers"]
+                                )
+                                global_serializers.update(flattened)
+
+                                # Assign the generated serializer to the API config
+                                serializer_name = f"{api_name}_serializer"
+                                if serializer_name in flattened:
+                                    api["serializer"] = serializer_name
+                                if serializer_name in flattened and not json_output:
+                                    msg = "[green]Generated and assigned"
+                                    msg += f" serializer '{serializer_name}' for "
+                                    msg += f"'{api_name}'[/green]"
+                                    err_console.print(msg)
+                                elif not json_output:
+                                    msg = "[green]Generated serializer "
+                                    msg += f"for '{api_name}'[/green]"
+                                    err_console.print(msg)
+                        except Exception as e:
+                            err_console.print(
+                                f"[yellow]Warning: Failed to parse generated "
+                                f"serializer for '{api_name}': {e}[/yellow]"
+                            )
+                    else:
+                        err_console.print(
+                            f"[yellow]Warning: Failed to generate serializer "
+                            f"for '{api_name}': {serializer_toml}[/yellow]"
+                        )
+                else:
+                    err_console.print(
+                        f"[yellow]Warning: Skipping '{api_name}' - "
+                        f"missing module or method[/yellow]"
+                    )
+            except Exception as e:
+                err_console.print(
+                    f"[yellow]Warning: Failed to auto-generate serializer "
+                    f"for '{api_name}': {e}[/yellow]"
+                )
+
+
+def _process_stdin_params(
+    has_stdin: bool,
+    config: list[str] | None,
+    user_params: dict[str, str],
+    err_console: Console,
+) -> None:
+    """
+    Process parameters from stdin if available.
+
+    Args:
+        has_stdin: Whether data is being piped via stdin
+        config: Config list from command line
+        user_params: User parameters dict to update
+        err_console: Console for error output
+    """
+    if has_stdin and config:
+        try:
+            stdin_data = sys.stdin.read()
+            if stdin_data.strip():
+                stdin_params = json.loads(stdin_data)
+                if not isinstance(stdin_params, dict):
+                    err_console.print(
+                        "[red]Error: stdin JSON must be an object/dict[/red]"
+                    )
+                    raise typer.Exit(1)
+                user_params.update(stdin_params)
+        except json.JSONDecodeError as e:
+            err_console.print(f"[red]Error: Invalid JSON from stdin: {e}[/red]")
+            raise typer.Exit(1) from e
+
+
 @app.command("run", help="Run API fetcher with config file")
 def main(
     config: list[str] = typer.Option(
@@ -740,131 +898,11 @@ def main(
 
     # Auto-generate serializers for APIs without explicit serializers
     if auto_serializer:
-        for api in apis:
-            api_name = api.get("name")
-            if not api_name:
-                continue
+        _auto_generate_serializers(
+            apis, config_data, global_serializers, user_params, err_console, json_output
+        )
 
-            # Check if API already has a serializer
-            client_ref = api.get("client")
-            existing_serializer = resolve_serializer(
-                api, global_serializers, client_ref
-            )
-
-            if not existing_serializer:  # No existing serializer found
-                if not json_output:
-                    err_console.print(
-                        f"[blue]Auto-generating serializer for '{api_name}'...[/blue]"
-                    )
-                try:
-                    # Generate serializer using the same logic as gen-serializer
-                    module = api.get("module")
-                    client_class = api.get("client_class", "Client")
-                    method = api.get("method")
-                    url = api.get("url")
-                    api_params = api.get("params")
-                    init_params = api.get("init_params")
-                    method_params = api.get("method_params", {})
-                    param_defaults = api.get("param_defaults", {})
-
-                    client_ref = api.get("client")
-                    if client_ref:
-                        clients = config_data.get("clients", {})
-                        if client_ref in clients:
-                            client_config = clients[client_ref]
-                            if not module:
-                                module = client_config.get("module")
-                            client_class = client_config.get("client_class", "Client")
-                            init_params = client_config.get("init_params", {})
-
-                    if module and method:
-                        # Apply variable substitution using param_defaults
-                        url = _substitute_vars(
-                            url, method_params, user_params, param_defaults
-                        )
-                        api_params = _substitute_vars(
-                            api_params, method_params, user_params, param_defaults
-                        )
-                        init_params = _substitute_vars(
-                            init_params, method_params, user_params, param_defaults
-                        )
-
-                        # Generate the serializer configuration
-                        serializer_toml = introspect_and_generate(
-                            module,
-                            client_class,
-                            method,
-                            url,
-                            api_params,
-                            init_params,
-                            f"{api_name}_serializer",
-                            method_params,
-                        )
-
-                        # Parse the generated TOML and add to global_serializers
-                        if serializer_toml and not serializer_toml.startswith(
-                            "# Error"
-                        ):
-                            try:
-                                import io
-
-                                generated_config = tomllib.load(
-                                    io.BytesIO(serializer_toml.encode())
-                                )
-                                if "serializers" in generated_config:
-                                    flattened = _flatten_serializers(
-                                        generated_config["serializers"]
-                                    )
-                                    global_serializers.update(flattened)
-
-                                    # Assign the generated serializer to the API config
-                                    serializer_name = f"{api_name}_serializer"
-                                    if serializer_name in flattened:
-                                        api["serializer"] = serializer_name
-                                    if serializer_name in flattened and not json_output:
-                                        msg = "[green]Generated and assigned"
-                                        msg += f" serializer '{serializer_name}' for "
-                                        msg += f"'{api_name}'[/green]"
-                                        err_console.print(msg)
-                                    elif not json_output:
-                                        msg = "[green]Generated serializer "
-                                        msg += f"for '{api_name}'[/green]"
-                                        err_console.print(msg)
-                            except Exception as e:
-                                err_console.print(
-                                    f"[yellow]Warning: Failed to parse generated "
-                                    f"serializer for '{api_name}': {e}[/yellow]"
-                                )
-                        else:
-                            err_console.print(
-                                f"[yellow]Warning: Failed to generate serializer "
-                                f"for '{api_name}': {serializer_toml}[/yellow]"
-                            )
-                    else:
-                        err_console.print(
-                            f"[yellow]Warning: Skipping '{api_name}' - "
-                            f"missing module or method[/yellow]"
-                        )
-                except Exception as e:
-                    err_console.print(
-                        f"[yellow]Warning: Failed to auto-generate serializer "
-                        f"for '{api_name}': {e}[/yellow]"
-                    )
-
-    if has_stdin and config:
-        try:
-            stdin_data = sys.stdin.read()
-            if stdin_data.strip():
-                stdin_params = json.loads(stdin_data)
-                if not isinstance(stdin_params, dict):
-                    err_console.print(
-                        "[red]Error: stdin JSON must be an object/dict[/red]"
-                    )
-                    raise typer.Exit(1)
-                user_params.update(stdin_params)
-        except json.JSONDecodeError as e:
-            err_console.print(f"[red]Error: Invalid JSON from stdin: {e}[/red]")
-            raise typer.Exit(1) from e
+    _process_stdin_params(has_stdin, config, user_params, err_console)
 
     shared_clients: dict[str, Any] = {}
     client_configs = config_data.get("clients", {})
