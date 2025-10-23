@@ -121,6 +121,7 @@ Contents
    quickstart
    user_guide
    examples
+   serializer
    api_reference
 
 Indices and tables
