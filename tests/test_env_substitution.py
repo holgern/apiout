@@ -3,7 +3,7 @@
 import os
 from unittest.mock import patch
 
-from apiout.fetcher import _substitute_env_vars
+from apiout.fetcher import _substitute_env_vars, _substitute_vars
 
 
 class TestEnvVarSubstitution:
@@ -93,3 +93,80 @@ class TestEnvVarSubstitution:
         """Test handling of empty variable name ${}."""
         result = _substitute_env_vars("test ${} value")
         assert result == "test ${} value"
+
+
+class TestVarSubstitution:
+    """Tests for _substitute_vars function with priority order."""
+
+    def test_substitute_vars_runtime_priority(self):
+        """Test that runtime params have highest priority."""
+        result = _substitute_vars(
+            "Bearer ${TOKEN}",
+            method_params={"TOKEN": "method_default"},
+            user_params={"TOKEN": "runtime_value"},
+            param_defaults={"TOKEN": "param_default"},
+        )
+        assert result == "Bearer runtime_value"
+
+    def test_substitute_vars_method_params_priority(self):
+        """Test that method_params have second priority."""
+        result = _substitute_vars(
+            "Bearer ${TOKEN}",
+            method_params={"TOKEN": "method_value"},
+            user_params=None,
+            param_defaults={"TOKEN": "param_default"},
+        )
+        assert result == "Bearer method_value"
+
+    def test_substitute_vars_param_defaults_priority(self):
+        """Test that param_defaults have third priority."""
+        result = _substitute_vars(
+            "Bearer ${TOKEN}",
+            method_params=None,
+            user_params=None,
+            param_defaults={"TOKEN": "param_default"},
+        )
+        assert result == "Bearer param_default"
+
+    def test_substitute_vars_env_fallback(self):
+        """Test environment variables as fallback."""
+        with patch.dict(os.environ, {"TOKEN": "env_value"}):
+            result = _substitute_vars(
+                "Bearer ${TOKEN}",
+                method_params=None,
+                user_params=None,
+                param_defaults=None,
+            )
+            assert result == "Bearer env_value"
+
+    def test_substitute_vars_missing_var(self):
+        """Test missing variable remains unchanged."""
+        result = _substitute_vars(
+            "Bearer ${MISSING}",
+            method_params=None,
+            user_params=None,
+            param_defaults=None,
+        )
+        assert result == "Bearer ${MISSING}"
+
+    def test_substitute_vars_in_dict(self):
+        """Test substitution in dictionary values."""
+        result = _substitute_vars(
+            {"url": "https://${HOST}/api", "key": "${API_KEY}"},
+            method_params={"HOST": "example.com"},
+            user_params=None,
+            param_defaults={"API_KEY": "default_key"},
+        )
+        expected = {"url": "https://example.com/api", "key": "default_key"}
+        assert result == expected
+
+    def test_substitute_vars_in_nested_dict(self):
+        """Test substitution in nested dictionaries."""
+        result = _substitute_vars(
+            {"auth": {"token": "${TOKEN}"}, "endpoint": "${HOST}"},
+            method_params={"TOKEN": "secret"},
+            user_params=None,
+            param_defaults={"HOST": "localhost"},
+        )
+        expected = {"auth": {"token": "secret"}, "endpoint": "localhost"}
+        assert result == expected

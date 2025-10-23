@@ -29,6 +29,7 @@ def _substitute_vars(
     value: Any,
     method_params: Optional[dict[str, Any]] = None,
     user_params: Optional[dict[str, str]] = None,
+    param_defaults: Optional[dict[str, Any]] = None,
 ) -> Any:
     """
     Recursively substitute variables in configuration values.
@@ -36,7 +37,8 @@ def _substitute_vars(
     Supports ${VAR_NAME} syntax with resolution order:
     1. user_params (runtime parameters from stdin/CLI)
     2. method_params (default method parameters from config)
-    3. Environment variables
+    3. param_defaults (default parameter values from config)
+    4. Environment variables
 
     If no value is found, the placeholder is left unchanged.
 
@@ -44,6 +46,7 @@ def _substitute_vars(
         value: Configuration value (can be str, dict, list, or other type)
         method_params: Optional dict of method parameter defaults
         user_params: Optional dict of runtime parameters
+        param_defaults: Optional dict of parameter default values
 
     Returns:
         Value with variables substituted
@@ -55,27 +58,35 @@ def _substitute_vars(
         'Bearer abc123'  # from user_params
         >>> _substitute_vars("Bearer ${TOKEN}", method_params={"TOKEN": "default"})
         'Bearer default'  # from method_params
+        >>> _substitute_vars("Bearer ${TOKEN}", param_defaults={"TOKEN": "fallback"})
+        'Bearer fallback'  # from param_defaults
     """
     if isinstance(value, str):
         # Match ${VAR_NAME} patterns
         def replacer(match):
             var_name = match.group(1)
 
-            # Priority: user_params > method_params > env vars
+            # Priority: user_params > method_params > param_defaults > env vars
             if user_params and var_name in user_params:
                 return str(user_params[var_name])
             elif method_params and var_name in method_params:
                 return str(method_params[var_name])
+            elif param_defaults and var_name in param_defaults:
+                return str(param_defaults[var_name])
             else:
                 return os.environ.get(var_name, match.group(0))
 
         return re.sub(r"\$\{([^}]+)\}", replacer, value)
     elif isinstance(value, dict):
         return {
-            k: _substitute_vars(v, method_params, user_params) for k, v in value.items()
+            k: _substitute_vars(v, method_params, user_params, param_defaults)
+            for k, v in value.items()
         }
     elif isinstance(value, list):
-        return [_substitute_vars(item, method_params, user_params) for item in value]
+        return [
+            _substitute_vars(item, method_params, user_params, param_defaults)
+            for item in value
+        ]
     else:
         return value
 
@@ -350,6 +361,7 @@ def fetch_api_data(
             return {"error": "No method specified"}
 
         method_params = api_config.get("method_params", {})
+        param_defaults = api_config.get("param_defaults", {})
 
         # Merge user_params with method_params, giving priority to user_params
         if user_params:
@@ -380,12 +392,14 @@ def fetch_api_data(
         method = getattr(client, method_name)
 
         # Apply variable substitution to all string fields
-        url = _substitute_vars(api_config.get("url", ""), method_params, user_params)
+        url = _substitute_vars(
+            api_config.get("url", ""), method_params, user_params, param_defaults
+        )
         params = _substitute_vars(
-            api_config.get("params", {}), method_params, user_params
+            api_config.get("params", {}), method_params, user_params, param_defaults
         )
         headers = _substitute_vars(
-            api_config.get("headers", {}), method_params, user_params
+            api_config.get("headers", {}), method_params, user_params, param_defaults
         )
 
         if user_params and isinstance(params, dict):

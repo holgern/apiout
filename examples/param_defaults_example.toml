@@ -1,0 +1,40 @@
+# Example demonstrating param_defaults for HTTP APIs
+# This shows how to provide default values for HTTP API parameters
+
+[[apis]]
+name = "weather_http"
+module = "httpx"
+method = "get"
+url = "https://api.open-meteo.com/v1/forecast"
+
+# Default parameter values for variable substitution
+# These have the lowest priority: runtime > method_params > param_defaults > env vars
+param_defaults = {latitude = 52.52, longitude = 13.41}
+
+[apis.params]
+latitude = "${latitude}"
+longitude = "${longitude}"
+current = ["temperature_2m", "relative_humidity_2m"]
+
+[apis.serializer]
+format = "method"
+method = "json"
+
+[[apis]]
+name = "weather_with_method_params"
+module = "httpx"
+method = "get"
+url = "https://api.open-meteo.com/v1/forecast"
+
+# method_params have higher priority than param_defaults
+method_params = {latitude = 51.5074, longitude = -0.1278}  # London coordinates
+param_defaults = {latitude = 52.52, longitude = 13.41}     # Berlin coordinates (fallback)
+
+[apis.params]
+latitude = "${latitude}"
+longitude = "${longitude}"
+current = ["temperature_2m"]
+
+[apis.serializer]
+format = "method"
+method = "json"

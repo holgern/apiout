@@ -7,7 +7,7 @@ Features
 --------
 
 * **Config-driven API calls**: Define API endpoints, parameters, and authentication in TOML files
-* **Variable substitution**: Use ``${param_name}`` syntax for dynamic URLs and parameters with runtime overrides
+* **Variable substitution**: Use ``${param_name}`` syntax for dynamic URLs and parameters with four-level priority system (runtime > method_params > param_defaults > env vars)
 * **Runtime parameter overrides**: Override defaults via CLI flags (``-p``), JSON stdin, or environment variables
 * **Flexible serialization**: Map API responses to desired output formats using configurable field mappings
 * **Reusable client configurations**: Define clients once and reference them from multiple APIs
@@ -72,33 +72,38 @@ Key Concepts
 **Variable Substitution Priority:**
 
 1. **Runtime parameters** (``-p`` flags or JSON stdin) - highest priority
-2. **method_params defaults** - from configuration file  
-3. **Environment variables** - fallback
+2. **method_params defaults** - from configuration file
+3. **param_defaults** - HTTP API parameter defaults (lowest priority before env vars)
+4. **Environment variables** - fallback
 
-**Understanding method_params vs [apis.params]:**
+**Understanding method_params vs param_defaults vs [apis.params]:**
 
-* ``method_params``: Default values for method arguments and variable substitution
+* ``method_params``: Default values for method arguments and variable substitution (higher priority)
+* ``param_defaults``: Default parameter values for HTTP APIs (lower priority, designed for HTTP parameter substitution)
 * ``[apis.params]``: Actual parameters passed to the API method (can use variable substitution)
 
-**Why do we need both?**
+**Why do we need all three?**
 
-``method_params`` defines *default values* that can be overridden at runtime and used in variable substitution. ``[apis.params]`` defines the *actual parameters* sent to the API method.
+``method_params`` defines *default values* for method arguments with higher priority. ``param_defaults`` provides *fallback values* specifically for HTTP API parameters when ``method_params`` isn't suitable. ``[apis.params]`` defines the *actual parameters* sent to the API method.
 
 **Example:**
 
 .. code-block:: toml
 
-   # Default values for substitution and method arguments
+   # For non-HTTP APIs - higher priority defaults
    method_params = {latitude = 52.52, longitude = 13.41, units = "metric"}
-   
-   # Actual API parameters (can use variables from method_params)
+
+   # For HTTP APIs - lower priority defaults
+   param_defaults = {latitude = 52.52, longitude = 13.41}
+
+   # Actual API parameters (can use variables from both sources)
    [apis.params]
-   latitude = "${latitude}"        # Uses runtime override or default
-   longitude = "${longitude}"      # Uses runtime override or default  
-   units = "${units}"             # Uses runtime override or default
+   latitude = "${latitude}"        # Uses runtime > method_params > param_defaults > env
+   longitude = "${longitude}"      # Uses runtime > method_params > param_defaults > env
+   units = "${units}"             # Uses runtime > method_params > env
    current = ["temperature_2m"]   # Static parameter
 
-When you run ``apiout run -c config.toml -p latitude=48.8566``, the ``${latitude}`` in ``[apis.params]`` gets substituted with ``48.8566``, while ``longitude`` and ``units`` use their defaults from ``method_params``.
+When you run ``apiout run -c config.toml -p latitude=48.8566``, the ``${latitude}`` in ``[apis.params]`` gets substituted with ``48.8566``. If no runtime parameter is provided, it uses ``method_params`` first, then ``param_defaults``, then environment variables.
 
 **Configuration Structure:**
 

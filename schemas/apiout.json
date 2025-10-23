@@ -119,6 +119,11 @@
           "description": "Default values for method parameters. Supports ${variable} substitution from runtime parameters and environment variables.",
           "additionalProperties": true
         },
+        "param_defaults": {
+          "type": "object",
+          "description": "Default parameter values for variable substitution in HTTP API parameters. Lowest priority in substitution order (runtime params > method_params > param_defaults > environment variables).",
+          "additionalProperties": true
+        },
         "serializer": {
           "description": "Reference to a serializer configuration (string) or inline serializer (object). String can be a simple name (resolved with client scope if 'client' is specified, or globally), a dotted reference (e.g., 'client_name.serializer_name'), or an inline object.",
           "oneOf": [

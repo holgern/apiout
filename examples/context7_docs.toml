@@ -10,13 +10,14 @@ name = "get_docs"
 module = "requests"
 client_class = "Session"
 method = "get"
-url = "https://context7.com/api/v1/${library_id}?type=json&topic=${topic}&tokens=${tokens}"
+url = "https://context7.com/api/v1/${library}?type=json&topic=${topic}&tokens=${tokens}"
+param_defaults = {library = "vercel/next.js", topic = "ssr", tokens = 5000}
 serializer = "get_docs_serializer"
 
 [apis.method_params]
-library_id = "vercel/next.js"
-topic = "ssr"
-tokens = 5000
+library = "${library}"
+topic = "${topic}"
+tokens = "${tokens}"
 
 [apis.headers]
 Authorization = "Bearer ${CONTEXT7_API_KEY}"
