@@ -7,7 +7,7 @@ from typing import Any
 import typer
 from rich.console import Console
 
-from .fetcher import fetch_api_data, process_post_processor
+from .fetcher import _substitute_vars, fetch_api_data, process_post_processor
 from .generator import (
     generate_api_toml,
     introspect_and_generate,
@@ -169,7 +169,8 @@ def _generate_api_serializer(
     url = api_config.get("url")
     params = api_config.get("params")
     init_params = api_config.get("init_params")
-    method_params = api_config.get("method_params")
+    method_params = api_config.get("method_params", {})
+    param_defaults = api_config.get("param_defaults", {})
     name = api_config["name"]
 
     client_ref = api_config.get("client")
@@ -187,6 +188,12 @@ def _generate_api_serializer(
             f"[red]Error: API '{name}' is missing 'module' or 'method'[/red]"
         )
         raise typer.Exit(1)
+
+    # Apply variable substitution using param_defaults for gen-serializer
+    # (no user_params available for this command)
+    url = _substitute_vars(url, method_params, None, param_defaults)
+    params = _substitute_vars(params, method_params, None, param_defaults)
+    init_params = _substitute_vars(init_params, method_params, None, param_defaults)
 
     result = introspect_and_generate(
         module,

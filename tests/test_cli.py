@@ -531,7 +531,7 @@ method = "get_data"
         None,
         None,
         "test_api_serializer",
-        None,
+        {},
     )
 
 
@@ -572,7 +572,7 @@ method = "get_block_tip_hash"
         None,
         {"api_base_url": "https://mempool.space/api/"},
         "mempool_api_serializer",
-        None,
+        {},
     )
 
 
