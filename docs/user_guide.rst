@@ -184,7 +184,7 @@ Run with both files:
 
 .. code-block:: bash
 
-   apiout run -c apis.toml -s serializers.toml
+   apiout run --config apis.toml -s serializers.toml
 
 Priority Order
 ^^^^^^^^^^^^^^
@@ -311,9 +311,26 @@ Client definitions are merged from multiple configuration files:
 
 .. code-block:: bash
 
-   apiout run -c base.toml -c apis.toml
+   apiout run --config base.toml -c apis.toml
 
 If the same client name appears in multiple files, later files override earlier ones.
+
+Config Directory Support
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+For easier configuration management, you can store configs in ``~/.config/apiout/`` and reference them by name:
+
+.. code-block:: bash
+
+   # Load config from ~/.config/apiout/mempool.toml
+   apiout run --config mempool --json
+
+   # Mix config names and file paths
+   apiout run --config mempool --config ./local.toml --json
+
+The tool follows XDG Base Directory specification:
+- Uses ``$XDG_CONFIG_HOME/apiout/`` if set
+- Falls back to ``~/.config/apiout/`` otherwise
 
 Multiple Configuration Files
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -322,7 +339,7 @@ You can use multiple configuration and serializer files with the ``-c`` and ``-s
 
 .. code-block:: bash
 
-   apiout run -c base.toml -c apis.toml -c more_apis.toml -s serializers1.toml -s serializers2.toml
+   apiout run --config base.toml -c apis.toml -c more_apis.toml -s serializers1.toml -s serializers2.toml
 
 Merging Behavior
 ^^^^^^^^^^^^^^^^
@@ -434,17 +451,17 @@ apiout supports two ways to use JSON with stdin:
 
 **1. JSON Parameters via stdin**
 
-Pass user parameters as JSON via stdin (works with ``-c`` or ``-e``):
+Pass user parameters as JSON via stdin (works with ``-c``):
 
 .. code-block:: bash
 
-   echo '{"time_period": "24h"}' | apiout run -c config.toml
+   echo '{"time_period": "24h"}' | apiout run --config config.toml
 
 This is equivalent to:
 
 .. code-block:: bash
 
-   apiout run -c config.toml -p time_period=24h
+   apiout run --config config.toml -p time_period=24h
 
 When both stdin and ``-p`` are provided, stdin parameters override ``-p`` parameters.
 
@@ -477,7 +494,7 @@ Override with stdin:
 
 .. code-block:: bash
 
-   echo '{"topic": "routing", "tokens": 100}' | apiout run -c api.toml
+   echo '{"topic": "routing", "tokens": 100}' | apiout run --config api.toml
 
 This will send ``topic=routing`` and ``tokens=100`` instead of the defaults.
 
@@ -502,10 +519,10 @@ Override client initialization parameters:
 .. code-block:: bash
 
    # Change fiat currency to USD
-   apiout run -c btcpriceticker.toml -p fiat=USD
+   apiout run --config btcpriceticker.toml -p fiat=USD
 
    # Change service to coingecko and lookback period to 7 days
-   echo '{"service": "coingecko", "days_ago": 7}' | apiout run -c btcpriceticker.toml
+   echo '{"service": "coingecko", "days_ago": 7}' | apiout run --config btcpriceticker.toml
 
 When ``init_params`` are overridden, apiout creates a new client instance with the updated parameters.
 This allows runtime customization without modifying configuration files.
@@ -532,7 +549,7 @@ When a parameter name appears in both ``init_params`` and ``user_inputs``, the b
    method = "get_data"
    user_inputs = ["fiat"]
 
-Running with ``apiout run -c config.toml -p fiat=USD``:
+Running with ``apiout run --config config.toml -p fiat=USD``:
 
 * Client is initialized with ``fiat="EUR"`` (from init_params)
 * Method is called as ``get_data("USD")`` (from user params)
@@ -549,7 +566,7 @@ If you want user params to override ``init_params``, do **not** include that par
 
 **2. Full JSON Configuration via stdin**
 
-Provide the entire configuration as JSON (without ``-c`` or ``-e``):
+Provide the entire configuration as JSON (without ``-c``):
 
 .. code-block:: bash
 
@@ -607,7 +624,7 @@ Output Formats
 
 .. code-block:: bash
 
-   apiout run -c config.toml --json
+   apiout run --config config.toml --json
 
 Outputs valid JSON for piping to other tools:
 
@@ -626,7 +643,7 @@ Outputs valid JSON for piping to other tools:
 
 .. code-block:: bash
 
-   apiout run -c config.toml
+   apiout run --config config.toml
 
 Uses Rich console formatting for readable output.
 

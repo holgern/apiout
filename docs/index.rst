@@ -42,7 +42,7 @@ Run the API fetcher:
 
 .. code-block:: bash
 
-   apiout run -c config.toml --json
+   apiout run --config config.toml --json
 
 Contents
 --------

@@ -53,30 +53,40 @@ def _get_config_dir() -> Path:
     return config_dir
 
 
-def _load_env_file(env_name: str) -> Path:
+def _resolve_config_path(config_value: str) -> Path:
     """
-    Load an environment file from ~/.config/apiout/
+    Resolve a config value to a Path.
+
+    - If contains .toml extension or path separators, treat as file path
+    - Otherwise, treat as name and look in config directory
 
     Args:
-        env_name: Name of the environment (e.g., "mempool", "btcprice")
+        config_value: Either a file path or a config name
 
     Returns:
-        Path to the environment TOML file
+        Resolved Path to config file
 
     Raises:
-        typer.Exit if the environment file doesn't exist
+        typer.Exit if file doesn't exist
     """
-    config_dir = _get_config_dir()
-    env_file = config_dir / f"{env_name}.toml"
+    path = Path(config_value)
 
-    if not env_file.exists():
+    # Check if it's a file path (contains separators or .toml extension)
+    if "/" in config_value or "\\" in config_value or config_value.endswith(".toml"):
+        config_path = path.expanduser().resolve()
+    else:
+        # Treat as config name, look in config directory
+        config_dir = _get_config_dir()
+        config_path = config_dir / f"{config_value}.toml"
+
+    if not config_path.exists():
         err_console.print(
-            f"[red]Error: Environment file not found: {env_file}[/red]\n"
-            f"[yellow]Hint: Create environment files in {config_dir}/[/yellow]"
+            f"[red]Error: Config file not found: {config_path}[/red]\n"
+            f"[yellow]Hint: Use --config with a file path or config name[/yellow]"
         )
         raise typer.Exit(1)
 
-    return env_file
+    return config_path
 
 
 @app.command("gen-serializer")
@@ -84,25 +94,17 @@ def gen_serializer_cmd(
     api: str = typer.Option(
         ..., "--api", "-a", help="API or post-processor name from config"
     ),
-    config: list[Path] = typer.Option(
-        None,
+    config: list[str] = typer.Option(
+        ...,
         "-c",
         "--config",
         help="Config file(s) to load (can be specified multiple times)",
     ),
-    env: str = typer.Option(None, "-e", "--env", help="Environment name to load"),
 ) -> None:
     """Generate serializer config by introspecting API response from existing config."""
-    if not config and not env:
-        err_console.print(
-            "[red]Error: Either --config or --env must be specified[/red]"
-        )
-        raise typer.Exit(1)
-
-    config_paths = list(config) if config else []
-    if env:
-        env_file = _load_env_file(env)
-        config_paths.append(env_file)
+    config_paths = []
+    for config_value in config:
+        config_paths.append(_resolve_config_path(config_value))
 
     config_data = _load_config_files(config_paths)
 
@@ -630,18 +632,11 @@ def _parse_params(param_list: list[str]) -> dict[str, str]:
 
 @app.command("run", help="Run API fetcher with config file")
 def main(
-    env: list[str] = typer.Option(
-        None,
-        "-e",
-        "--env",
-        help="Environment name to load from ~/.config/apiout/ "
-        "(can be specified multiple times)",
-    ),
-    config: list[Path] = typer.Option(
+    config: list[str] = typer.Option(
         None,
         "-c",
         "--config",
-        help="Path to TOML configuration file (can be specified multiple times)",
+        help="Config file(s) to load (can be specified multiple times)",
     ),
     serializers: list[Path] = typer.Option(
         None,
@@ -660,7 +655,7 @@ def main(
 ) -> None:
     has_stdin = not sys.stdin.isatty()
 
-    if has_stdin and not config and not env:
+    if has_stdin and not config:
         try:
             stdin_data = sys.stdin.read()
             config_data = json.loads(stdin_data)
@@ -670,17 +665,13 @@ def main(
     else:
         all_config_files: list[Path] = []
 
-        if env:
-            for env_name in env:
-                env_file = _load_env_file(env_name)
-                all_config_files.append(env_file)
-
         if config:
-            all_config_files.extend(config)
+            for config_value in config:
+                all_config_files.append(_resolve_config_path(config_value))
 
         if not all_config_files:
             err_console.print(
-                "[red]Error: At least one of --env, --config must be provided "
+                "[red]Error: At least one --config must be provided "
                 "(or pipe JSON to stdin)[/red]"
             )
             raise typer.Exit(1)
@@ -699,7 +690,7 @@ def main(
 
     user_params = _parse_params(params) if params else {}
 
-    if has_stdin and (config or env):
+    if has_stdin and config:
         try:
             stdin_data = sys.stdin.read()
             if stdin_data.strip():

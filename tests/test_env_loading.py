@@ -8,7 +8,7 @@ from unittest.mock import patch
 import pytest
 import typer
 
-from apiout.cli import _get_config_dir, _load_config_files, _load_env_file
+from apiout.cli import _get_config_dir, _load_config_files, _resolve_config_path
 
 
 class TestGetConfigDir:
@@ -58,11 +58,11 @@ class TestGetConfigDir:
             pytest.skip("Windows-specific test")
 
 
-class TestLoadEnvFile:
-    """Tests for _load_env_file function."""
+class TestResolveConfigPath:
+    """Tests for _resolve_config_path function."""
 
-    def test_load_existing_env_file(self):
-        """Test loading an existing environment file returns path."""
+    def test_resolve_config_name(self):
+        """Test resolving a config name to config directory path."""
         with tempfile.TemporaryDirectory() as tmpdir:
             env_dir = Path(tmpdir)
             env_file = env_dir / "test_env.toml"
@@ -75,18 +75,58 @@ name = "test_api"
 """)
 
             with patch("apiout.cli._get_config_dir", return_value=env_dir):
-                result = _load_env_file("test_env")
+                result = _resolve_config_path("test_env")
                 assert result == env_file
                 assert result.exists()
 
-    def test_load_missing_env_file(self):
-        """Test loading a non-existent environment file raises typer.Exit."""
+    def test_resolve_config_path_with_extension(self):
+        """Test resolving a config path with .toml extension."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+            config_file = tmpdir / "test.toml"
+            config_file.write_text("""
+[clients.test]
+module = "test_module"
+
+[[apis]]
+name = "test_api"
+""")
+
+            result = _resolve_config_path(str(config_file))
+            assert result == config_file.resolve()
+            assert result.exists()
+
+    def test_resolve_config_path_with_separators(self):
+        """Test resolving a config path with separators."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+            config_file = tmpdir / "subdir" / "test.toml"
+            config_file.parent.mkdir()
+            config_file.write_text("""
+[clients.test]
+module = "test_module"
+
+[[apis]]
+name = "test_api"
+""")
+
+            result = _resolve_config_path(str(config_file))
+            assert result == config_file.resolve()
+            assert result.exists()
+
+    def test_resolve_missing_config_name(self):
+        """Test resolving a non-existent config name raises typer.Exit."""
         with tempfile.TemporaryDirectory() as tmpdir:
             env_dir = Path(tmpdir)
 
             with patch("apiout.cli._get_config_dir", return_value=env_dir):
                 with pytest.raises(typer.Exit):
-                    _load_env_file("nonexistent")
+                    _resolve_config_path("nonexistent")
+
+    def test_resolve_missing_config_path(self):
+        """Test resolving a non-existent config path raises typer.Exit."""
+        with pytest.raises(typer.Exit):
+            _resolve_config_path("/nonexistent/config.toml")
 
 
 class TestLoadConfigFilesWithEnv:

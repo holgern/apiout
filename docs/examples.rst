@@ -72,7 +72,7 @@ Fetch weather data from the OpenMeteo API with full serialization.
 
 .. code-block:: bash
 
-   apiout run -c examples/apis.toml -s examples/serializers.toml --json
+   apiout run --config examples/apis.toml -s examples/serializers.toml --json
 
 **Expected Output**
 
@@ -162,7 +162,7 @@ Run without serializer config:
 
 .. code-block:: bash
 
-   apiout run -c config.toml --json
+   apiout run --config config.toml --json
 
 apiout will automatically convert objects to dictionaries, showing all public attributes.
 
@@ -298,7 +298,7 @@ Run with just the config file:
 
 .. code-block:: bash
 
-   apiout run -c config.toml --json
+   apiout run --config config.toml --json
 
 Python Integration Example
 ---------------------------
@@ -416,7 +416,7 @@ When multiple APIs use the same client, define it once and reference it multiple
 .. code-block:: bash
 
    pip install pymempool
-   apiout run -c mempool_apis.toml --json
+   apiout run --config mempool_apis.toml --json
 
 **How It Works**
 
@@ -467,7 +467,7 @@ For clients that require initialization, define ``init_method`` in the client co
 .. code-block:: bash
 
    pip install btcpriceticker
-   apiout run -c btcpriceticker.toml --json
+   apiout run --config btcpriceticker.toml --json
 
 **How It Works**
 
@@ -548,7 +548,7 @@ For large projects, split configurations into multiple files:
 
 .. code-block:: bash
 
-   apiout run -c base.toml -c weather_apis.toml -c more_apis.toml -s custom_serializers.toml --json
+   apiout run --config base.toml --config weather_apis.toml --config more_apis.toml -s custom_serializers.toml --json
 
 **How It Works**
 
@@ -575,13 +575,13 @@ Integrate apiout into data processing pipelines:
 .. code-block:: bash
 
    # Fetch data and pipe to jq for filtering
-   apiout run -c config.toml --json | jq '.berlin_weather[0].current'
+   apiout run --config config.toml --json | jq '.berlin_weather[0].current'
 
    # Save to file
-   apiout run -c config.toml --json > weather_data.json
+   apiout run --config config.toml --json > weather_data.json
 
    # Pipe to Python for processing
-   apiout run -c config.toml --json | python process_weather.py
+   apiout run --config config.toml --json | python process_weather.py
 
 Combining Multiple APIs
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -591,9 +591,9 @@ Combining Multiple APIs
    # Run multiple configs and merge results
    {
      echo "{"
-     apiout run -c weather.toml --json | jq -r '.berlin_weather'
+     apiout run --config weather.toml --json | jq -r '.berlin_weather'
      echo ","
-     apiout run -c stocks.toml --json | jq -r '.stock_data'
+     apiout run --config stocks.toml --json | jq -r '.stock_data'
      echo "}"
    } | jq -s '.[0]'
 
@@ -659,7 +659,7 @@ When multiple APIs use the same client, define it once and reference it multiple
 .. code-block:: bash
 
    pip install pymempool
-   apiout run -c mempool_apis.toml --json
+   apiout run --config mempool_apis.toml --json
 
 **How It Works**
 
@@ -710,7 +710,7 @@ For clients that require initialization, define ``init_method`` in the client co
 .. code-block:: bash
 
    pip install btcpriceticker
-   apiout run -c btcpriceticker.toml --json
+   apiout run --config btcpriceticker.toml --json
 
 **How It Works**
 
@@ -770,7 +770,7 @@ Post-processors allow you to combine and transform data from multiple API calls 
 .. code-block:: bash
 
    pip install pymempool
-   apiout run -c mempool_apis.toml -s mempool_serializers.toml --json
+   apiout run --config mempool_apis.toml -s mempool_serializers.toml --json
 
 **How It Works**
 

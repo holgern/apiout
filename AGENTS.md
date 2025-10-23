@@ -104,8 +104,7 @@ README.md                  # Project README
 
 ### TOML Schema
 
-The project includes a JSON Schema for TOML validation located at
-`schemas/apiout.json`.
+The project includes a JSON Schema for TOML validation located at `schemas/apiout.json`.
 
 When adding new fields or properties to TOML configurations:
 

@@ -496,10 +496,9 @@ def test_gen_api_with_url_and_params():
     assert "longitude = 13.41" in result.stdout
 
 
-def test_gen_serializer_requires_config_or_env():
+def test_gen_serializer_requires_config():
     result = runner.invoke(app, ["gen-serializer", "--api", "test_api"])
-    assert result.exit_code == 1
-    assert "Either --config or --env must be specified" in result.output
+    assert result.exit_code == 2  # Typer validation error for missing required option
 
 
 def test_gen_serializer_with_config(tmp_path, monkeypatch):

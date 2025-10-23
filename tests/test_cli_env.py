@@ -1,4 +1,4 @@
-"""Integration tests for CLI with environment flags."""
+"""Integration tests for CLI with config flags."""
 
 import tempfile
 from pathlib import Path
@@ -11,8 +11,8 @@ from apiout.cli import app
 runner = CliRunner()
 
 
-def test_cli_with_env_flag():
-    """Test CLI with -e/--env flag loads environment file."""
+def test_cli_with_config_name():
+    """Test CLI with --config flag using config name."""
     with tempfile.TemporaryDirectory() as tmpdir:
         env_dir = Path(tmpdir)
 
@@ -32,19 +32,19 @@ url = "http://example.com"
 
         # Mock the config directory
         with patch("apiout.cli._get_config_dir", return_value=env_dir):
-            result = runner.invoke(app, ["run", "-e", "test", "--json"])
+            result = runner.invoke(app, ["run", "-c", "test", "--json"])
 
         # Should succeed (won't actually call API with mock)
         assert result.exit_code == 0
 
 
-def test_cli_with_multiple_env_flags():
-    """Test CLI with multiple -e flags."""
+def test_cli_with_multiple_config_flags():
+    """Test CLI with multiple -c flags."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        env_dir = Path(tmpdir)
+        tmpdir = Path(tmpdir)
 
-        # Create two environment files
-        env1 = env_dir / "env1.toml"
+        # Create two config files
+        env1 = tmpdir / "env1.toml"
         env1.write_text("""
 [clients.client1]
 module = "unittest.mock"
@@ -57,7 +57,7 @@ method = "Mock"
 url = "http://example1.com"
 """)
 
-        env2 = env_dir / "env2.toml"
+        env2 = tmpdir / "env2.toml"
         env2.write_text("""
 [clients.client2]
 module = "unittest.mock"
@@ -70,14 +70,13 @@ method = "Mock"
 url = "http://example2.com"
 """)
 
-        with patch("apiout.cli._get_config_dir", return_value=env_dir):
-            result = runner.invoke(app, ["run", "-e", "env1", "-e", "env2", "--json"])
+        result = runner.invoke(app, ["run", "-c", str(env1), "-c", str(env2), "--json"])
 
         assert result.exit_code == 0
 
 
-def test_cli_with_env_and_config():
-    """Test CLI with both -e and -c flags."""
+def test_cli_with_config_name_and_path():
+    """Test CLI with both config name and file path."""
     with tempfile.TemporaryDirectory() as tmpdir:
         tmpdir = Path(tmpdir)
         env_dir = tmpdir / "envs"
@@ -115,25 +114,32 @@ url = "http://config.com"
 
         with patch("apiout.cli._get_config_dir", return_value=env_dir):
             result = runner.invoke(
-                app, ["run", "-e", "env1", "-c", str(config_file), "--json"]
+                app, ["run", "-c", "env1", "-c", str(config_file), "--json"]
             )
 
         assert result.exit_code == 0
 
 
-def test_cli_missing_env_file():
-    """Test CLI with non-existent environment file."""
+def test_cli_missing_config_name():
+    """Test CLI with non-existent config name."""
     with tempfile.TemporaryDirectory() as tmpdir:
         env_dir = Path(tmpdir)
 
         with patch("apiout.cli._get_config_dir", return_value=env_dir):
-            result = runner.invoke(app, ["run", "-e", "nonexistent", "--json"])
+            result = runner.invoke(app, ["run", "-c", "nonexistent", "--json"])
 
         assert result.exit_code == 1
 
 
-def test_cli_no_config_or_env():
-    """Test CLI without any config or env flags."""
+def test_cli_missing_config_path():
+    """Test CLI with non-existent config path."""
+    result = runner.invoke(app, ["run", "-c", "/nonexistent/config.toml", "--json"])
+
+    assert result.exit_code == 1
+
+
+def test_cli_no_config():
+    """Test CLI without any config flags."""
     result = runner.invoke(app, ["run", "--json"])
 
     assert result.exit_code == 1

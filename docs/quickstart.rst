@@ -38,7 +38,7 @@ Run the fetcher:
 
 .. code-block:: bash
 
-   apiout run -c apis.toml --json
+   apiout run --config apis.toml --json
 
 The tool will automatically convert response objects to dictionaries.
 
@@ -76,7 +76,7 @@ Run the same command:
 
 .. code-block:: bash
 
-   apiout run -c apis.toml --json
+   apiout run --config apis.toml --json
 
 3. With Separate Serializer File
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -116,7 +116,7 @@ Run with both files:
 
 .. code-block:: bash
 
-   apiout run -c apis.toml -s serializers.toml --json
+   apiout run --config apis.toml -s serializers.toml --json
 
 4. With Reusable Client Configurations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -149,7 +149,7 @@ Run the command:
 
 .. code-block:: bash
 
-   apiout run -c apis.toml --json
+   apiout run --config apis.toml --json
 
 This eliminates repetition when multiple APIs share the same client configuration.
 
@@ -191,12 +191,14 @@ Fetch API data with configuration:
 
 .. code-block:: bash
 
-   apiout run -c <config.toml> [-s <serializers.toml>] [--json]
+   apiout run --config <config.toml> [-s <serializers.toml>] [--json]
    <json-source> | apiout run [--json]  # Read JSON config from stdin
 
 **Options:**
 
-* ``-c, --config``: Path to API configuration file (TOML)
+* ``-c, --config``: Config file to load (can be specified multiple times). Accepts:
+  - Config name (e.g., ``mempool``) → loads from ``~/.config/apiout/mempool.toml``
+  - File path (e.g., ``./local.toml`` or ``/abs/path/config.toml``)
 * ``-s, --serializers``: Path to serializers configuration file (optional)
 * ``--json``: Output as JSON format (default: pretty-printed)
 

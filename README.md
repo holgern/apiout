@@ -121,14 +121,14 @@ Run with just the API config:
 apiout run -c apis.toml --json
 ```
 
-### 4. Environment Files
+### 4. Config Directory
 
 For cleaner configuration management, you can store reusable API configurations in
-`~/.config/apiout/` and load them with the `-e`/`--env` flag:
+`~/.config/apiout/` and load them by name using the `--config` flag:
 
 **Setup:**
 
-Create environment files in `~/.config/apiout/`:
+Create config files in `~/.config/apiout/`:
 
 ```bash
 # ~/.config/apiout/mempool.toml
@@ -172,14 +172,18 @@ serializer = "price_data"
 **Usage:**
 
 ```bash
-# Load single environment
-apiout run -e mempool --json
+# Load single config by name
+apiout run --config mempool --json
 
-# Load multiple environments
-apiout run -e mempool -e btcprice --json
+# Load multiple configs by name
+apiout run --config mempool --config btcprice --json
 
-# Mix environments with explicit configs
-apiout run -e mempool -c custom.toml --json
+# Use relative/absolute paths
+apiout run --config ./local.toml --json
+apiout run --config /abs/path/config.toml --json
+
+# Mix config names and paths
+apiout run --config mempool --config ./custom.toml --json
 ```
 
 **XDG Base Directory Support:**
@@ -220,8 +224,8 @@ apiout run -c config.toml -p time_period=24h --json
 # Multiple parameters
 apiout run -c config.toml -p param1=value1 -p param2=value2 --json
 
-# Combine with environments
-apiout run -e mempool -p time_period=1w --json
+# Combine with config names
+apiout run --config mempool -p time_period=1w --json
 ```
 
 **Features:**
@@ -238,14 +242,14 @@ apiout run -e mempool -p time_period=1w --json
 ### `run` - Fetch API Data
 
 ```bash
-# Using environment files
-apiout run -e <env_name> [--json]
+# Using config files (by name or path)
+apiout run --config <config_name_or_path> [--json]
 
-# Using config files
-apiout run -c <config.toml> [-s <serializers.toml>] [--json]
+# Multiple config files
+apiout run --config <config1> --config <config2> [-s <serializers.toml>] [--json]
 
-# Mix environments and config files
-apiout run -e <env1> -e <env2> -c <config.toml> [--json]
+# Mix config names and paths
+apiout run --config mempool --config ./local.toml [--json]
 
 # OR pipe JSON configuration from stdin
 <json-source> | apiout run [--json]
@@ -253,10 +257,9 @@ apiout run -e <env1> -e <env2> -c <config.toml> [--json]
 
 **Options:**
 
-- `-e, --env`: Environment name to load from `~/.config/apiout/` (can be specified
-  multiple times)
-- `-c, --config`: Path to API configuration file (TOML format, can be specified multiple
-  times)
+- `-c, --config`: Config file to load (can be specified multiple times). Accepts:
+  - Config name (e.g., `mempool`) → loads from `~/.config/apiout/mempool.toml`
+  - File path (e.g., `./local.toml` or `/abs/path/config.toml`)
 - `-s, --serializers`: Path to serializers configuration file (optional, can be
   specified multiple times)
 - `-p, --param`: User parameter in format `key=value` (can be specified multiple times)
@@ -338,15 +341,19 @@ config:
 # Generate serializer from API config
 apiout gen-serializer --config examples/mempool_apis.toml --api block_tip_hash
 
-# Using environment
-apiout gen-serializer --env production --api recommended_fees
+# Using config name
+apiout gen-serializer --config production --api recommended_fees
+
+# Mix config names and paths
+apiout gen-serializer --config mempool --config ./local.toml --api block_tip_hash
 ```
 
 **Options:**
 
 - `-a, --api`: API name from config (required)
-- `-c, --config`: Config file(s) to load (can be specified multiple times)
-- `-e, --env`: Environment name to load
+- `-c, --config`: Config file(s) to load (can be specified multiple times). Accepts:
+  - Config name (e.g., `mempool`) → loads from `~/.config/apiout/mempool.toml`
+  - File path (e.g., `./local.toml` or `/abs/path/config.toml`)
 
 **How it works:**
 
