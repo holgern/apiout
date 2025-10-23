@@ -25,8 +25,64 @@ else:
 from .serializer import serialize_response
 
 
+def _substitute_vars(
+    value: Any,
+    method_params: Optional[dict[str, Any]] = None,
+    user_params: Optional[dict[str, str]] = None,
+) -> Any:
+    """
+    Recursively substitute variables in configuration values.
+
+    Supports ${VAR_NAME} syntax with resolution order:
+    1. user_params (runtime parameters from stdin/CLI)
+    2. method_params (default method parameters from config)
+    3. Environment variables
+
+    If no value is found, the placeholder is left unchanged.
+
+    Args:
+        value: Configuration value (can be str, dict, list, or other type)
+        method_params: Optional dict of method parameter defaults
+        user_params: Optional dict of runtime parameters
+
+    Returns:
+        Value with variables substituted
+
+    Examples:
+        >>> _substitute_vars("Bearer ${API_KEY}")
+        'Bearer secret123'  # from env var
+        >>> _substitute_vars("Bearer ${TOKEN}", user_params={"TOKEN": "abc123"})
+        'Bearer abc123'  # from user_params
+        >>> _substitute_vars("Bearer ${TOKEN}", method_params={"TOKEN": "default"})
+        'Bearer default'  # from method_params
+    """
+    if isinstance(value, str):
+        # Match ${VAR_NAME} patterns
+        def replacer(match):
+            var_name = match.group(1)
+
+            # Priority: user_params > method_params > env vars
+            if user_params and var_name in user_params:
+                return str(user_params[var_name])
+            elif method_params and var_name in method_params:
+                return str(method_params[var_name])
+            else:
+                return os.environ.get(var_name, match.group(0))
+
+        return re.sub(r"\$\{([^}]+)\}", replacer, value)
+    elif isinstance(value, dict):
+        return {
+            k: _substitute_vars(v, method_params, user_params) for k, v in value.items()
+        }
+    elif isinstance(value, list):
+        return [_substitute_vars(item, method_params, user_params) for item in value]
+    else:
+        return value
+
+
 def _substitute_env_vars(value: Any) -> Any:
     """
+    Legacy function for backward compatibility.
     Recursively substitute environment variables in configuration values.
 
     Supports ${VAR_NAME} syntax. If the environment variable is not set,
@@ -45,19 +101,7 @@ def _substitute_env_vars(value: Any) -> Any:
         >>> _substitute_env_vars({"auth": "${API_KEY}", "timeout": 30})
         {'auth': 'secret123', 'timeout': 30}
     """
-    if isinstance(value, str):
-        # Match ${VAR_NAME} patterns
-        def replacer(match):
-            var_name = match.group(1)
-            return os.environ.get(var_name, match.group(0))
-
-        return re.sub(r"\$\{([^}]+)\}", replacer, value)
-    elif isinstance(value, dict):
-        return {k: _substitute_env_vars(v) for k, v in value.items()}
-    elif isinstance(value, list):
-        return [_substitute_env_vars(item) for item in value]
-    else:
-        return value
+    return _substitute_vars(value)
 
 
 def resolve_serializer(
@@ -201,9 +245,8 @@ def _prepare_method_arguments(
     url: str,
     params: dict[str, Any],
     headers: dict[str, Any],
-    user_inputs: list[str],
+    method_params: dict[str, Any],
     user_params: dict[str, str],
-    user_defaults: dict[str, Any],
 ) -> tuple[list, dict]:
     """
     Prepare arguments and kwargs for the API method call.
@@ -220,31 +263,15 @@ def _prepare_method_arguments(
     method_args = []
     method_kwargs = {}
 
-    if user_inputs:
-        for user_input in user_inputs:
-            if user_input in user_params:
-                value: Any = user_params[user_input]
-            elif user_input in user_defaults:
-                value = user_defaults[user_input]
-            else:
-                continue
-
-            try:
-                if isinstance(value, str):
-                    if value.isdigit():
-                        value = int(value)
-                    elif value.replace(".", "", 1).isdigit():
-                        value = float(value)
-            except (AttributeError, ValueError):
-                pass
-
-            method_args.append(value)
-    elif "params" in param_names:
-        method_kwargs["params"] = params
-        if url:
-            method_args.append(url)
-    elif len(param_names) >= 1 and url:
+    # For HTTP methods like requests.Session.get(), URL should be first argument
+    if url:
         method_args.append(url)
+    else:
+        # For non-HTTP methods, pass method_params as positional arguments
+        # in the order they appear in the method signature
+        for param_name in param_names:
+            if param_name in method_params:
+                method_args.append(method_params[param_name])
 
     # Add params and headers as kwargs if method accepts **kwargs
     if has_kwargs:
@@ -279,8 +306,7 @@ def fetch_api_data(
             - init_params: Params for client initialization (optional)
             - url: URL parameter to pass to method (optional)
             - params: Additional parameters for method (optional)
-            - user_inputs: List of required user parameter names (optional)
-            - user_defaults: Default values for user inputs (optional)
+        - method_params: Default values for method parameters (optional)
             - serializer: Serializer config or reference (optional)
         global_serializers: Named serializer configurations
         shared_clients: Dict to store/retrieve shared client instances
@@ -323,11 +349,21 @@ def fetch_api_data(
         if not method_name:
             return {"error": "No method specified"}
 
-        user_inputs = api_config.get("user_inputs", [])
+        method_params = api_config.get("method_params", {})
 
-        if user_params and init_params:
+        # Merge user_params with method_params, giving priority to user_params
+        if user_params:
+            merged_method_params = method_params.copy()
             for key, value in user_params.items():
-                if key in init_params and key not in user_inputs:
+                merged_method_params[key] = value
+            method_params = merged_method_params
+
+        # Only override init_params with user_params if the key is NOT in method_params
+        # This prevents method_params from interfering with init_params
+        if user_params and init_params:
+            original_method_params = api_config.get("method_params", {})
+            for key, value in user_params.items():
+                if key in init_params and key not in original_method_params:
                     init_params[key] = value
 
         module = importlib.import_module(module_name)
@@ -343,19 +379,23 @@ def fetch_api_data(
 
         method = getattr(client, method_name)
 
-        url = _substitute_env_vars(api_config.get("url", ""))
-        params = _substitute_env_vars(api_config.get("params", {}))
-        headers = _substitute_env_vars(api_config.get("headers", {}))
-        user_defaults = api_config.get("user_defaults", {})
+        # Apply variable substitution to all string fields
+        url = _substitute_vars(api_config.get("url", ""), method_params, user_params)
+        params = _substitute_vars(
+            api_config.get("params", {}), method_params, user_params
+        )
+        headers = _substitute_vars(
+            api_config.get("headers", {}), method_params, user_params
+        )
 
         if user_params and isinstance(params, dict):
             for key, value in user_params.items():
-                if key in params or key not in user_inputs:
+                if key in params or key not in method_params:
                     params[key] = value
 
         if callable(method):
             method_args, method_kwargs = _prepare_method_arguments(
-                method, url, params, headers, user_inputs, user_params, user_defaults
+                method, url, params, headers, method_params, user_params
             )
             responses = method(*method_args, **method_kwargs)
         else:
@@ -564,13 +604,13 @@ class ApiClient:
         for api_config in self.apis:
             api_name = api_config.get("name", "unknown")
 
-            required_inputs = api_config.get("user_inputs", [])
-            if required_inputs:
-                user_defaults = api_config.get("user_defaults", {})
+            method_params = api_config.get("method_params", {})
+            if method_params:
                 missing = [
-                    inp
-                    for inp in required_inputs
-                    if inp not in self.user_params and inp not in user_defaults
+                    param_name
+                    for param_name, param_value in method_params.items()
+                    if (param_value == "" or param_value is None)
+                    and param_name not in self.user_params
                 ]
                 if missing:
                     self.status[api_name] = {

@@ -60,114 +60,7 @@ class TestFetchApiDataWithUserParams:
             "module": "sys",
             "client_class": "MockClient",
             "method": "test_method",
-            "user_inputs": ["param1"],
-        }
-
-        with patch("importlib.import_module") as mock_import:
-            mock_module = MagicMock()
-            mock_module.MockClient = MockClient
-            mock_import.return_value = mock_module
-
-            result = fetch_api_data(api_config, user_params={"param1": "test_value"})
-
-            assert result == "result_test_value"
-
-    def test_fetch_with_multiple_user_params(self):
-        class MockClient:
-            def test_method(self, param1, param2):
-                return f"{param1}_{param2}"
-
-        api_config = {
-            "module": "sys",
-            "client_class": "MockClient",
-            "method": "test_method",
-            "user_inputs": ["param1", "param2"],
-        }
-
-        with patch("importlib.import_module") as mock_import:
-            mock_module = MagicMock()
-            mock_module.MockClient = MockClient
-            mock_import.return_value = mock_module
-
-            result = fetch_api_data(
-                api_config, user_params={"param1": "foo", "param2": "bar"}
-            )
-
-            assert result == "foo_bar"
-
-    def test_fetch_with_integer_coercion(self):
-        class MockClient:
-            def test_method(self, count):
-                return count * 2
-
-        api_config = {
-            "module": "sys",
-            "client_class": "MockClient",
-            "method": "test_method",
-            "user_inputs": ["count"],
-        }
-
-        with patch("importlib.import_module") as mock_import:
-            mock_module = MagicMock()
-            mock_module.MockClient = MockClient
-            mock_import.return_value = mock_module
-
-            result = fetch_api_data(api_config, user_params={"count": "42"})
-
-            assert result == 84
-
-    def test_fetch_with_float_coercion(self):
-        class MockClient:
-            def test_method(self, value):
-                return value + 1.5
-
-        api_config = {
-            "module": "sys",
-            "client_class": "MockClient",
-            "method": "test_method",
-            "user_inputs": ["value"],
-        }
-
-        with patch("importlib.import_module") as mock_import:
-            mock_module = MagicMock()
-            mock_module.MockClient = MockClient
-            mock_import.return_value = mock_module
-
-            result = fetch_api_data(api_config, user_params={"value": "3.5"})
-
-            assert result == 5.0
-
-    def test_fetch_without_user_inputs_unchanged(self):
-        class MockClient:
-            def test_method(self):
-                return "no_params"
-
-        api_config = {
-            "module": "sys",
-            "client_class": "MockClient",
-            "method": "test_method",
-        }
-
-        with patch("importlib.import_module") as mock_import:
-            mock_module = MagicMock()
-            mock_module.MockClient = MockClient
-            mock_import.return_value = mock_module
-
-            result = fetch_api_data(api_config)
-
-            assert result == "no_params"
-
-    def test_fetch_with_user_defaults(self):
-        class MockClient:
-            def test_method(self, param1):
-                return f"result_{param1}"
-
-        api_config = {
-            "module": "sys",
-            "client_class": "MockClient",
-            "method": "test_method",
-            "user_inputs": ["param1"],
-            "user_defaults": {"param1": "default_value"},
+            "method_params": {"param1": "default_value"},
         }
 
         with patch("importlib.import_module") as mock_import:
@@ -179,7 +72,7 @@ class TestFetchApiDataWithUserParams:
 
             assert result == "result_default_value"
 
-    def test_fetch_with_user_defaults_override(self):
+    def test_fetch_with_method_params_override(self):
         class MockClient:
             def test_method(self, param1):
                 return f"result_{param1}"
@@ -188,8 +81,7 @@ class TestFetchApiDataWithUserParams:
             "module": "sys",
             "client_class": "MockClient",
             "method": "test_method",
-            "user_inputs": ["param1"],
-            "user_defaults": {"param1": "default_value"},
+            "method_params": {"param1": "default_value"},
         }
 
         with patch("importlib.import_module") as mock_import:
@@ -217,7 +109,7 @@ client_class = "MockClient"
 name = "test_api"
 client = "test"
 method = "test_method"
-user_inputs = ["param1"]
+method_params = {param1 = ""}
 """
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
@@ -248,7 +140,7 @@ module = "sys"
 name = "test_api"
 client = "test"
 method = "test_method"
-user_inputs = ["param1"]
+method_params = {param1 = ""}
 """
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
@@ -279,54 +171,10 @@ module = "sys"
 client_class = "MockClient"
 
 [[apis]]
-name = "api1"
-client = "test"
-method = "method1"
-user_inputs = ["param1"]
-
-[[apis]]
-name = "api2"
-client = "test"
-method = "method2"
-user_inputs = ["param2"]
-"""
-
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
-            f.write(config_content)
-            config_path = f.name
-
-        try:
-            with patch("importlib.import_module") as mock_import:
-                mock_module = MagicMock()
-                mock_module.MockClient = MockClient
-                mock_import.return_value = mock_module
-
-                client = ApiClient(config_path, user_params={"param1": "value1"})
-                results = client.fetch()
-
-                assert "api1" in results
-                assert results["api1"] == "result1_value1"
-                assert "api2" not in results
-                assert client.status["api2"]["success"] is False
-        finally:
-            Path(config_path).unlink()
-
-    def test_api_client_with_user_defaults(self):
-        class MockClient:
-            def test_method(self, param1):
-                return f"result_{param1}"
-
-        config_content = """
-[clients.test]
-module = "sys"
-client_class = "MockClient"
-
-[[apis]]
 name = "test_api"
 client = "test"
-method = "test_method"
-user_inputs = ["param1"]
-user_defaults = {param1 = "default_value"}
+method = "method1"
+method_params = {param1 = "default_value"}
 """
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
@@ -343,7 +191,7 @@ user_defaults = {param1 = "default_value"}
                 results = client.fetch()
 
                 assert "test_api" in results
-                assert results["test_api"] == "result_default_value"
+                assert results["test_api"] == "result1_default_value"
                 assert client.status["test_api"]["success"] is True
         finally:
             Path(config_path).unlink()
@@ -362,8 +210,7 @@ client_class = "MockClient"
 name = "test_api"
 client = "test"
 method = "test_method"
-user_inputs = ["param1"]
-user_defaults = {param1 = "default_value"}
+method_params = {param1 = "default_value"}
 """
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
@@ -449,7 +296,7 @@ class TestInitParamsOverride:
             assert result["days_ago"] == "7"
             assert result["service"] == "coinpaprika"
 
-    def test_init_params_not_overridden_by_user_inputs(self):
+    def test_init_params_not_overridden_by_method_params(self):
         class MockClient:
             def __init__(self, fiat="EUR"):
                 self.fiat = fiat
@@ -462,7 +309,7 @@ class TestInitParamsOverride:
             "client_class": "MockClient",
             "method": "test_method",
             "init_params": {"fiat": "EUR"},
-            "user_inputs": ["fiat"],
+            "method_params": {"fiat": None, "topic": "test_topic"},
         }
 
         with patch("importlib.import_module") as mock_import:
@@ -595,7 +442,7 @@ client_class = "MockClient"
 name = "test_api"
 client = "test"
 method = "test_method"
-user_inputs = ["param1"]
+method_params = {param1 = ""}
 """
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
@@ -640,7 +487,7 @@ client_class = "MockClient"
 name = "test_api"
 client = "test"
 method = "test_method"
-user_inputs = ["param1", "param2"]
+method_params = {param1 = "", param2 = ""}
 """
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
@@ -688,7 +535,7 @@ module = "sys"
 name = "test_api"
 client = "test"
 method = "test_method"
-user_inputs = ["param1"]
+method_params = {param1 = ""}
 """
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:

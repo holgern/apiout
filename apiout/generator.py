@@ -247,7 +247,7 @@ def introspect_and_generate(
     params: Optional[dict[str, Any]] = None,
     init_params: Optional[dict[str, Any]] = None,
     serializer_name: str = "generated",
-    user_defaults: Optional[dict[str, Any]] = None,
+    method_params: Optional[dict[str, Any]] = None,
 ) -> str:
     try:
         module = importlib.import_module(module_name)
@@ -261,18 +261,18 @@ def introspect_and_generate(
         method = getattr(client, method_name)
 
         sig = inspect.signature(method)
-        method_params = list(sig.parameters.keys())
+        param_names = list(sig.parameters.keys())
 
         method_args = []
         method_kwargs = {}
 
-        if user_defaults:
-            for value in user_defaults.values():
+        if method_params:
+            for value in method_params.values():
                 method_args.append(value)
-        elif url is not None and "params" in method_params:
+        elif url is not None and "params" in param_names:
             method_args.append(url)
             method_kwargs["params"] = params or {}
-        elif url is not None and len(method_params) > 0:
+        elif url is not None and len(param_names) > 0:
             method_args.append(url)
         elif params:
             method_kwargs.update(params)
@@ -363,8 +363,7 @@ def generate_api_toml(
     init_params: Optional[dict[str, Any]] = None,
     url: Optional[str] = None,
     params: Optional[dict[str, Any]] = None,
-    user_inputs: Optional[list[str]] = None,
-    user_defaults: Optional[dict[str, Any]] = None,
+    method_params: Optional[dict[str, Any]] = None,
 ) -> str:
     lines = []
 
@@ -406,13 +405,9 @@ def generate_api_toml(
             else:
                 lines.append(f"{key} = {value}")
 
-    if user_inputs:
-        user_inputs_str = str(user_inputs).replace("'", '"')
-        lines.append(f"user_inputs = {user_inputs_str}")
-
-    if user_defaults:
-        user_defaults_str = str(user_defaults).replace("'", '"')
-        lines.append(f"user_defaults = {user_defaults_str}")
+    if method_params:
+        method_params_str = str(method_params).replace("'", '"')
+        lines.append(f"method_params = {method_params_str}")
 
     return "\n".join(lines)
 

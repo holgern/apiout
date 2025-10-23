@@ -337,16 +337,14 @@ def test_generate_api_toml_with_init_params():
     assert 'init_params = {"api_base_url": "https://mempool.space/api/"}' in result
 
 
-def test_generate_api_toml_with_user_inputs():
+def test_generate_api_toml_with_method_params():
     result = generate_api_toml(
         name="block_feerates",
         module_name="pymempool",
         client_class="MempoolAPI",
         method_name="get_block_feerates",
         client_ref="mempool",
-        user_inputs=["time_period"],
-        user_defaults={"time_period": "24h"},
+        method_params={"time_period": "24h"},
     )
 
-    assert 'user_inputs = ["time_period"]' in result
-    assert 'user_defaults = {"time_period": "24h"}' in result
+    assert 'method_params = {"time_period": "24h"}' in result

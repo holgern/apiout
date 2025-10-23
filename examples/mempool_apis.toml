@@ -38,8 +38,7 @@ serializer = "mempool_blocks_fee_serializer"
 name = "block_feerates"
 client = "mempool"
 method = "get_block_feerates"
-user_inputs = ["time_period"]
-user_defaults = {time_period = "24h"}
+method_params = {time_period = "24h"}
 serializer = "block_feerates_serializer"
 
 [[post_processors]]

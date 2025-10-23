@@ -169,7 +169,7 @@ def _generate_api_serializer(
     url = api_config.get("url")
     params = api_config.get("params")
     init_params = api_config.get("init_params")
-    user_defaults = api_config.get("user_defaults")
+    method_params = api_config.get("method_params")
     name = api_config["name"]
 
     client_ref = api_config.get("client")
@@ -196,7 +196,7 @@ def _generate_api_serializer(
         params,
         init_params,
         f"{name}_serializer",
-        user_defaults,
+        method_params,
     )
     print(result)
 
@@ -276,11 +276,8 @@ def gen_api_cmd(
     params: str = typer.Option(
         None, "--params", "-p", help="JSON params dict (optional)"
     ),
-    user_inputs: str = typer.Option(
-        None, "--user-inputs", help="JSON array of required user input parameter names"
-    ),
-    user_defaults: str = typer.Option(
-        None, "--user-defaults", help="JSON dict of default values for user inputs"
+    method_params: str = typer.Option(
+        None, "--method-params", help="JSON dict of method parameter defaults"
     ),
 ) -> None:
     init_params_dict = None
@@ -299,28 +296,17 @@ def gen_api_cmd(
             err_console.print(f"[red]Error: Invalid JSON params: {e}[/red]")
             raise typer.Exit(1) from e
 
-    user_inputs_list = None
-    if user_inputs:
+    method_params_dict = None
+    if method_params:
         try:
-            user_inputs_list = json.loads(user_inputs)
-            if not isinstance(user_inputs_list, list):
-                err_console.print("[red]Error: user_inputs must be a JSON array[/red]")
-                raise typer.Exit(1)
-        except json.JSONDecodeError as e:
-            err_console.print(f"[red]Error: Invalid JSON user_inputs: {e}[/red]")
-            raise typer.Exit(1) from e
-
-    user_defaults_dict = None
-    if user_defaults:
-        try:
-            user_defaults_dict = json.loads(user_defaults)
-            if not isinstance(user_defaults_dict, dict):
+            method_params_dict = json.loads(method_params)
+            if not isinstance(method_params_dict, dict):
                 err_console.print(
-                    "[red]Error: user_defaults must be a JSON object[/red]"
+                    "[red]Error: method_params must be a JSON object[/red]"
                 )
                 raise typer.Exit(1)
         except json.JSONDecodeError as e:
-            err_console.print(f"[red]Error: Invalid JSON user_defaults: {e}[/red]")
+            err_console.print(f"[red]Error: Invalid JSON method_params: {e}[/red]")
             raise typer.Exit(1) from e
 
     result = generate_api_toml(
@@ -332,8 +318,7 @@ def gen_api_cmd(
         init_params=init_params_dict,
         url=url,
         params=params_dict,
-        user_inputs=user_inputs_list,
-        user_defaults=user_defaults_dict,
+        method_params=method_params_dict,
     )
 
     print(result)
@@ -761,13 +746,13 @@ def main(
 
         name = api["name"]
 
-        required_inputs = api.get("user_inputs", [])
-        if required_inputs:
-            user_defaults = api.get("user_defaults", {})
+        method_params = api.get("method_params", {})
+        if method_params:
             missing = [
-                inp
-                for inp in required_inputs
-                if inp not in user_params and inp not in user_defaults
+                param_name
+                for param_name, param_value in method_params.items()
+                if (param_value == "" or param_value is None)
+                and param_name not in user_params
             ]
             if missing:
                 err_console.print(

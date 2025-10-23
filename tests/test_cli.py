@@ -421,7 +421,7 @@ def test_gen_api_with_init_params():
     )
 
 
-def test_gen_api_with_user_inputs():
+def test_gen_api_with_method_params():
     result = runner.invoke(
         app,
         [
@@ -436,15 +436,12 @@ def test_gen_api_with_user_inputs():
             "get_block_feerates",
             "--name",
             "block_feerates",
-            "--user-inputs",
-            '["time_period"]',
-            "--user-defaults",
+            "--method-params",
             '{"time_period": "24h"}',
         ],
     )
     assert result.exit_code == 0
-    assert 'user_inputs = ["time_period"]' in result.stdout
-    assert 'user_defaults = {"time_period": "24h"}' in result.stdout
+    assert 'method_params = {"time_period": "24h"}' in result.stdout
 
 
 def test_gen_api_with_invalid_init_params():
@@ -627,7 +624,7 @@ def test_gen_serializer_no_apis_section(tmp_path):
     assert "No 'apis' or 'post_processors' section found" in result.output
 
 
-def test_gen_serializer_with_user_defaults(tmp_path, monkeypatch):
+def test_gen_serializer_with_method_params(tmp_path, monkeypatch):
     from unittest.mock import Mock
 
     mock_introspect = Mock(
@@ -644,8 +641,7 @@ name = "test_api"
 module = "test_module"
 client_class = "TestClient"
 method = "get_data"
-user_inputs = ["time_period"]
-user_defaults = {time_period = "24h"}
+method_params = {time_period = "24h"}
 """
     )
 

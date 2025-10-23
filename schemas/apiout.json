@@ -114,6 +114,11 @@
           "description": "Parameters to pass to the API method",
           "additionalProperties": true
         },
+        "method_params": {
+          "type": "object",
+          "description": "Default values for method parameters. Supports ${variable} substitution from runtime parameters and environment variables.",
+          "additionalProperties": true
+        },
         "serializer": {
           "description": "Reference to a serializer configuration (string) or inline serializer (object). String can be a simple name (resolved with client scope if 'client' is specified, or globally), a dotted reference (e.g., 'client_name.serializer_name'), or an inline object.",
           "oneOf": [
