@@ -808,3 +808,96 @@ Post-processors allow you to combine and transform data from multiple API calls 
 * Calculating statistics across multiple API responses
 * Aggregating data from different sources
 * Transforming API responses into domain objects
+
+Variable Substitution Example
+-----------------------------
+
+Dynamic URL and Parameter Building
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Use ``${param_name}`` syntax for dynamic configuration with variable substitution:
+
+**Configuration with Variable Substitution**
+
+``context7_docs.toml``:
+
+.. code-block:: toml
+
+   [[apis]]
+   name = "get_docs"
+   module = "requests"
+   client_class = "Session"
+   method = "get"
+   url = "https://context7.com/api/v1/${library_id}?type=json&topic=${topic}&tokens=${tokens}"
+   method_params = {library_id = "", topic = "default", tokens = 1000}
+
+**Running with Different Parameters**
+
+.. code-block:: bash
+
+   # Get Next.js hooks documentation
+   apiout run -c context7_docs.toml -p library_id=/vercel/next.js -p topic=hooks -p tokens=3000 --json
+
+   # Get React documentation
+   apiout run -c context7_docs.toml -p library_id=/facebook/react -p topic=components -p tokens=5000 --json
+
+**Environment Variable Integration**
+
+.. code-block:: bash
+
+   # Set environment variables
+   export CONTEXT7_TOKENS=2000
+   export DEFAULT_LIBRARY="/vercel/next.js"
+
+   # Use environment variables as fallbacks
+   apiout run -c context7_docs.toml -p topic=hooks --json
+
+**Advanced Substitution Examples**
+
+**Multiple Variable Sources**
+
+.. code-block:: toml
+
+   [clients.weather_client]
+   module = "openmeteo_requests"
+   client_class = "Client"
+   init_params = {base_url = "https://api.open-meteo.com"}
+
+   [[apis]]
+   name = "city_weather"
+   client = "weather_client"
+   method = "weather_api"
+   url = "${base_url}/v1/forecast"
+   method_params = {latitude = 52.52, longitude = 13.41, units = "metric"}
+
+   [apis.params]
+   latitude = "${latitude}"
+   longitude = "${longitude}"
+   current = ["temperature_2m", "relative_humidity_2m"]
+   units = "${units}"
+
+   [apis.headers]
+   User-Agent = "apiout-client/${units}"
+
+**Runtime Override**
+
+.. code-block:: bash
+
+   # Override coordinates and units
+   echo '{"latitude": 48.8566, "longitude": 2.3522, "units": "imperial"}' | apiout run -c weather.toml --json
+
+**Benefits of Variable Substitution**
+
+* **Dynamic Configuration**: Change URLs and parameters without editing config files
+* **Environment Integration**: Use environment variables for secrets and defaults
+* **Template Reuse**: Same config works for different APIs by changing parameters
+* **CI/CD Friendly**: Easy to integrate into automated workflows
+* **Security**: Keep sensitive values in environment variables, not config files
+
+**Variable Resolution Priority**
+
+1. Runtime parameters (``-p`` flags or JSON stdin) - highest priority
+2. ``method_params`` defaults from configuration
+3. Environment variables - fallback
+
+This allows flexible configuration management across different environments and use cases.

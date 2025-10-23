@@ -41,6 +41,7 @@ Optional Fields
 * ``client_class``: Name of the client class (default: "Client")
 * ``serializer``: Reference to a serializer configuration (string) or inline serializer (dict)
 * ``params``: Dictionary of parameters to pass to the API method
+* ``method_params``: Default parameters for the method, can be overridden at runtime
 * ``init_params``: Parameters to pass to the client class constructor
 * ``client``: Reference to a client configuration from the ``[clients]`` section
 
@@ -451,7 +452,7 @@ apiout supports two ways to use JSON with stdin:
 
 **1. JSON Parameters via stdin**
 
-Pass user parameters as JSON via stdin (works with ``-c``):
+Pass method parameters as JSON via stdin (works with ``-c``):
 
 .. code-block:: bash
 
@@ -467,13 +468,12 @@ When both stdin and ``-p`` are provided, stdin parameters override ``-p`` parame
 
 **How it works:**
 
-* User parameters from stdin (or ``-p`` flags) are merged into both the ``params`` dictionary and ``init_params``
-* Parameters that already exist in ``params`` or ``init_params`` are overridden
-* New parameters not in the config are added to ``params``
-* Parameters in ``user_inputs`` are passed as method arguments (not merged into ``params`` or ``init_params``)
+* Method parameters from stdin (or ``-p`` flags) are merged with ``method_params`` defaults
+* Runtime parameters have highest priority, followed by ``method_params`` defaults, then environment variables
+* Parameters are also available for variable substitution in URLs, params, and headers using ``${param_name}`` syntax
 * When ``init_params`` are overridden, a new client instance is created with the updated parameters
 
-**Example: Override params values**
+**Example: Override method_params values**
 
 Configuration file (``api.toml``):
 
@@ -485,10 +485,7 @@ Configuration file (``api.toml``):
    client_class = "Session"
    method = "get"
    url = "https://api.example.com/docs"
-
-   [apis.params]
-   topic = "default_topic"
-   tokens = 5000
+   method_params = {topic = "default_topic", tokens = 5000}
 
 Override with stdin:
 
@@ -527,11 +524,11 @@ Override client initialization parameters:
 When ``init_params`` are overridden, apiout creates a new client instance with the updated parameters.
 This allows runtime customization without modifying configuration files.
 
-**Important: Interaction between user_inputs and init_params**
+**Important: Interaction between method_params and init_params**
 
-When a parameter name appears in both ``init_params`` and ``user_inputs``, the behavior is:
+When a parameter name appears in both ``init_params`` and ``method_params``, the behavior is:
 
-* The parameter in ``init_params`` is **NOT** overridden by user params
+* The parameter in ``init_params`` is **NOT** overridden by method params
 * The user-provided value is passed as a method argument instead
 * This allows the client to maintain its initialization state while the method receives different values
 
@@ -547,14 +544,14 @@ When a parameter name appears in both ``init_params`` and ``user_inputs``, the b
    [[apis]]
    client = "example"
    method = "get_data"
-   user_inputs = ["fiat"]
+   method_params = {fiat = "USD"}
 
-Running with ``apiout run --config config.toml -p fiat=USD``:
+Running with ``apiout run --config config.toml -p fiat=GBP``:
 
 * Client is initialized with ``fiat="EUR"`` (from init_params)
-* Method is called as ``get_data("USD")`` (from user params)
+* Method is called as ``get_data("GBP")`` (from runtime params, overriding method_params default)
 
-If you want user params to override ``init_params``, do **not** include that parameter in ``user_inputs``.
+If you want runtime params to override ``init_params``, do **not** include that parameter in ``method_params``.
 
 **Benefits:**
 
@@ -563,6 +560,97 @@ If you want user params to override ``init_params``, do **not** include that par
 * Support for nested objects and arrays
 * No need to escape special characters
 * Override default parameter values without modifying config files
+
+Variable Substitution
+~~~~~~~~~~~~~~~~~~~~~
+
+apiout supports universal variable substitution using ``${param_name}`` syntax in URLs, parameters, and headers. Variables are resolved from multiple sources with the following priority:
+
+1. **Runtime parameters** (highest priority) - from ``-p`` flags or JSON stdin
+2. **method_params defaults** - from configuration
+3. **Environment variables** (fallback) - from system environment
+
+**URL Substitution**
+
+.. code-block:: toml
+
+   [[apis]]
+   name = "api_docs"
+   module = "requests"
+   client_class = "Session"
+   method = "get"
+   url = "https://api.example.com/v1/${library_id}?type=json&topic=${topic}&tokens=${tokens}"
+   method_params = {library_id = "", topic = "default", tokens = 1000}
+
+Running with:
+
+.. code-block:: bash
+
+   apiout run -c config.toml -p library_id=/vercel/next.js -p topic=hooks -p tokens=3000
+
+Results in URL: ``https://api.example.com/v1/vercel/next.js?type=json&topic=hooks&tokens=3000``
+
+**Parameter Substitution**
+
+.. code-block:: toml
+
+   [[apis]]
+   name = "weather_api"
+   module = "openmeteo_requests"
+   client_class = "Client"
+   method = "weather_api"
+   url = "https://api.open-meteo.com/v1/forecast"
+   method_params = {latitude = 52.52, longitude = 13.41}
+
+   [apis.params]
+   latitude = "${latitude}"
+   longitude = "${longitude}"
+   current = ["temperature_2m"]
+
+**Header Substitution**
+
+.. code-block:: toml
+
+   [[apis]]
+   name = "authenticated_api"
+   module = "requests"
+   client_class = "Session"
+   method = "get"
+   url = "https://api.example.com/data"
+   method_params = {api_key = ""}
+
+   [apis.headers]
+   Authorization = "Bearer ${api_key}"
+   Content-Type = "application/json"
+
+**Environment Variable Fallback**
+
+If a parameter is not provided via runtime or method_params, apiout falls back to environment variables:
+
+.. code-block:: bash
+
+   export API_KEY="your-api-key-here"
+   export DEFAULT_TOPIC="general"
+
+.. code-block:: toml
+
+   [[apis]]
+   name = "env_api"
+   module = "requests"
+   client_class = "Session"
+   method = "get"
+   url = "https://api.example.com/${DEFAULT_TOPIC}"
+   method_params = {api_key = "${API_KEY}"}
+
+**Advanced Usage**
+
+Variable substitution works with all string fields and supports:
+
+* Nested substitution: ``${base_url}/${endpoint}``
+* Default values: If no environment variable exists, the substitution fails gracefully
+* Multiple occurrences: Use the same variable multiple times in different fields
+
+This feature makes configurations more dynamic and reusable across different environments and use cases.
 
 **2. Full JSON Configuration via stdin**
 
@@ -660,6 +748,80 @@ apiout provides clear error messages for common issues:
 
 All errors are displayed with context to help diagnose issues quickly.
 
+Migration Guide
+---------------
+
+This section covers breaking changes and how to migrate existing configurations.
+
+**Breaking Changes in Recent Versions**
+
+**user_inputs/user_defaults → method_params**
+
+The old ``user_inputs`` (list) and ``user_defaults`` (dict) fields have been consolidated into a single ``method_params`` (dict) field.
+
+**Old Configuration:**
+
+.. code-block:: toml
+
+   [[apis]]
+   name = "example_api"
+   module = "mymodule"
+   method = "get_data"
+   user_inputs = ["param1", "param2"]
+   user_defaults = {param1 = "default1", param2 = "default2"}
+
+**New Configuration:**
+
+.. code-block:: toml
+
+   [[apis]]
+   name = "example_api"
+   module = "mymodule"
+   method = "get_data"
+   method_params = {param1 = "default1", param2 = "default2"}
+
+**CLI Changes**
+
+The CLI options have changed from ``--user-inputs``/``--user-defaults`` to ``--method-params``:
+
+.. code-block:: bash
+
+   # Old way
+   apiout run --config config.toml --user-inputs param1=value1 --user-defaults param2=value2
+
+   # New way
+   apiout run --config config.toml --param param1=value1 --param param2=value2
+
+**New Variable Substitution Feature**
+
+Take advantage of the new ``${param_name}`` substitution syntax:
+
+.. code-block:: toml
+
+   [[apis]]
+   name = "dynamic_api"
+   module = "requests"
+   method = "get"
+   url = "https://api.example.com/v1/${endpoint}/${id}"
+   method_params = {endpoint = "users", id = "123"}
+
+   [apis.params]
+   limit = "${limit}"
+   format = "${format}"
+
+Run with runtime overrides:
+
+.. code-block:: bash
+
+   apiout run -c config.toml -p endpoint=posts -p id=456 -p limit=10 -p format=json
+
+**Benefits of Migration**
+
+* **Simplified Configuration**: Single ``method_params`` field instead of two separate fields
+* **Variable Substitution**: Dynamic URL and parameter building with ``${}`` syntax
+* **Better Priority Handling**: Clear precedence: runtime > method_params > environment
+* **Unified CLI**: Single ``-p`` flag for all method parameters
+
 Best Practices
 --------------
 
@@ -669,3 +831,5 @@ Best Practices
 4. **Use Generator**: Generate initial serializer configs, then refine manually
 5. **Version Control**: Store config files in version control
 6. **Document Custom Serializers**: Add comments to explain complex field mappings
+7. **Leverage Variable Substitution**: Use ``${}`` syntax for dynamic configurations
+8. **Environment Variables**: Use environment variables for secrets and defaults

@@ -52,6 +52,7 @@ Fetches data from an API using the provided configuration.
 
 * ``api_config`` (Dict[str, Any]): API configuration dictionary
 * ``global_serializers`` (Optional[Dict[str, Any]]): Global serializer configurations
+* ``user_params`` (Optional[Dict[str, str]]): Runtime parameters to override method_params
 
 **Returns:**
 
@@ -217,15 +218,16 @@ API Configuration
 
 .. code-block:: python
 
-   {
-       "name": str,              # Required: API identifier
-       "module": str,            # Required: Python module name
-       "client_class": str,      # Optional: Client class name (default: "Client")
-       "method": str,            # Required: Method name to call
-       "url": str,               # Required: API URL
-       "serializer": str | dict, # Optional: Serializer reference or config
-       "params": dict            # Optional: API parameters
-   }
+{
+        "name": str,              # Required: API identifier
+        "module": str,            # Required: Python module name
+        "client_class": str,      # Optional: Client class name (default: "Client")
+        "method": str,            # Required: Method name to call
+        "url": str,               # Required: API URL
+        "serializer": str | dict, # Optional: Serializer reference or config
+        "params": dict,           # Optional: API parameters
+        "method_params": dict     # Optional: Default method parameters
+    }
 
 Serializer Configuration
 ^^^^^^^^^^^^^^^^^^^^^^^^

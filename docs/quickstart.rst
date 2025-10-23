@@ -202,6 +202,7 @@ Fetch API data with configuration:
 * ``-s, --serializers``: Serializer file to load (can be specified multiple times). Accepts:
   - Serializer name (e.g., ``my_serializers``) → loads from ``~/.config/apiout/my_serializers.toml``
   - File path (e.g., ``./serializers.toml`` or ``/abs/path/serializers.toml``)
+* ``-p, --param``: Method parameter in format ``key=value`` (can be specified multiple times)
 * ``--json``: Output as JSON format (default: pretty-printed)
 
 When piping JSON to stdin (without ``-c``), apiout automatically detects and parses it.
