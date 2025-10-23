@@ -829,6 +829,35 @@ def _process_stdin_params(
             raise typer.Exit(1) from e
 
 
+def _build_output_with_flatten(apis: list[dict], results: dict) -> dict:
+    """Build output with flatten support for APIs that have flatten=True."""
+    # Check if any APIs have flatten=True
+    has_flatten = any(api.get("flatten", False) for api in apis)
+
+    if not has_flatten:
+        return results
+
+    # Create mixed output: flattened APIs at top level, others nested
+    output = {}
+    non_flattened = {}
+
+    for api in apis:
+        name = api["name"]
+        if api.get("flatten", False):
+            # For flattened APIs, merge their content directly
+            if isinstance(results[name], dict):
+                output.update(results[name])
+            else:
+                # If not a dict, use the API name as key
+                output[name] = results[name]
+        else:
+            non_flattened[name] = results[name]
+
+    # Add non-flattened results
+    output.update(non_flattened)
+    return output
+
+
 @app.command("run", help="Run API fetcher with config file")
 def main(
     config: list[str] = typer.Option(
@@ -946,10 +975,12 @@ def main(
             post_processor, results, global_serializers
         )
 
+    output = _build_output_with_flatten(apis, results)
+
     if json_output:
-        print(json.dumps(results, indent=2))
+        print(json.dumps(output, indent=2))
     else:
-        console.print(results)
+        console.print(output)
 
 
 if __name__ == "__main__":

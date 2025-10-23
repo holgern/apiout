@@ -136,6 +136,11 @@
               "description": "Inline serializer configuration"
             }
           ]
+        },
+        "flatten": {
+          "type": "boolean",
+          "description": "When true, flattens this API's output by removing the name wrapper in JSON output",
+          "default": false
         }
       },
       "additionalProperties": true
