@@ -41,16 +41,75 @@ def call_method_or_attr(obj: Any, name: str) -> Any:
     return attr
 
 
+def traverse_path(obj: Any, path_parts: list[str]) -> Any:
+    current = obj
+    idx = 0
+
+    while idx < len(path_parts):
+        if current is None:
+            return None
+
+        part = path_parts[idx]
+
+        if isinstance(current, str):
+            try:
+                current = json.loads(current)
+                continue
+            except (json.JSONDecodeError, TypeError, ValueError):
+                return None
+
+        if isinstance(current, dict) and part in current:
+            current = current[part]
+        elif isinstance(current, Mapping) and part in current:
+            current = current[part]
+        elif isinstance(current, list) and part.isdigit():
+            idx_value = int(part)
+            if 0 <= idx_value < len(current):
+                current = current[idx_value]
+            else:
+                return None
+        else:
+            try:
+                current = call_method_or_attr(current, part)
+            except AttributeError:
+                return None
+
+        idx += 1
+
+    return current
+
+
 def apply_field_mapping(obj: Any, field_config: Any) -> Any:
     if isinstance(field_config, str):
-        return call_method_or_attr(obj, field_config)
+        # Handle simple dot notation paths
+        if "." in field_config:
+            path_parts = field_config.split(".")
+            return traverse_path(obj, path_parts)
+        else:
+            return call_method_or_attr(obj, field_config)
     if isinstance(field_config, dict):
         result = {}
         for key, value in field_config.items():
             if isinstance(value, str):
-                result[key] = call_method_or_attr(obj, value)
+                if "." in value:
+                    result[key] = traverse_path(obj, value.split("."))
+                else:
+                    result[key] = call_method_or_attr(obj, value)
             elif isinstance(value, dict):
-                if "method" in value:
+                if "path" in value:
+                    # Handle direct path extraction with JSON parsing support
+                    path = value["path"]
+                    path_parts = path.split(".")
+                    current = traverse_path(obj, path_parts)
+
+                    # Handle limit for arrays
+                    if isinstance(current, list) and "limit" in value:
+                        limit = value["limit"]
+                        if isinstance(limit, int) and limit > 0:
+                            current = current[:limit]
+
+                    result[key] = current
+                elif "method" in value:
                     nested_obj = call_method_or_attr(obj, value["method"])
                     if nested_obj is not None:
                         if "fields" in value:
@@ -62,31 +121,22 @@ def apply_field_mapping(obj: Any, field_config: Any) -> Any:
                             count_method = value["iterate"].get("count")
                             item_method = value["iterate"].get("item")
                             item_fields = value["iterate"].get("fields", {})
+                            limit = value["iterate"].get("limit", None)
 
                             if count_method and item_method:
                                 count = call_method_or_attr(nested_obj, count_method)
-                                for i in range(count):
+                                max_items = (
+                                    min(count, limit)
+                                    if isinstance(limit, int) and limit > 0
+                                    else count
+                                )
+                                for i in range(max_items):
                                     item_obj = getattr(nested_obj, item_method)(i)
                                     item_data = apply_field_mapping(
                                         item_obj, item_fields
                                     )
                                     items.append(item_data)
                                 result[key] = items
-                        else:
-                            result[key] = serialize_value(nested_obj)
-                elif "iterate" in value:
-                    items = []
-                    count_method = value["iterate"].get("count")
-                    item_method = value["iterate"].get("item")
-                    item_fields = value["iterate"].get("fields", {})
-
-                    if count_method and item_method:
-                        count = call_method_or_attr(obj, count_method)
-                        for i in range(count):
-                            item_obj = getattr(obj, item_method)(i)
-                            item_data = apply_field_mapping(item_obj, item_fields)
-                            items.append(item_data)
-                        result[key] = items
                 elif "fields" in value:
                     result[key] = apply_field_mapping(obj, value["fields"])
         return result

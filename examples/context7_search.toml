@@ -26,4 +26,6 @@ ok = "ok"
 reason = "reason"
 status_code = "status_code"
 url = "url"
-text = "text"
+id_0 = "text.results.0.id"
+id_1 = "text.results.1.id"
+results = { path = "text.results", limit = 2}

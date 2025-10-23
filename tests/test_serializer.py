@@ -1,3 +1,4 @@
+import json
 from collections.abc import Mapping
 
 from apiout.serializer import (
@@ -256,3 +257,32 @@ def test_call_method_or_attr_with_mapping():
     assert call_method_or_attr(mapping, "key1") == "value1"
     assert call_method_or_attr(mapping, "key2") == 42
     assert call_method_or_attr(mapping, "missing") is None
+
+
+def test_apply_field_mapping_path_through_attribute_with_json_string():
+    class ResponseLike:
+        def __init__(self, payload: str):
+            self._payload = payload
+
+        @property
+        def text(self):
+            return self._payload
+
+    payload = json.dumps(
+        {
+            "results": [
+                {"id": "/first/id", "title": "First"},
+                {"id": "/second/id", "title": "Second"},
+            ]
+        }
+    )
+    obj = ResponseLike(payload)
+    config = {
+        "first_id": "text.results.0.id",
+        "first_result": {"path": "text.results", "limit": 1},
+    }
+
+    result = apply_field_mapping(obj, config)
+
+    assert result["first_id"] == "/first/id"
+    assert result["first_result"] == [{"id": "/first/id", "title": "First"}]
