@@ -184,7 +184,7 @@ Run with both files:
 
 .. code-block:: bash
 
-   apiout run --config apis.toml -s serializers.toml
+   apiout run --config apis.toml --serializers serializers.toml
 
 Priority Order
 ^^^^^^^^^^^^^^
@@ -339,7 +339,7 @@ You can use multiple configuration and serializer files with the ``-c`` and ``-s
 
 .. code-block:: bash
 
-   apiout run --config base.toml -c apis.toml -c more_apis.toml -s serializers1.toml -s serializers2.toml
+   apiout run --config base.toml --config apis.toml --config more_apis.toml --serializers serializers1.toml --serializers serializers2.toml
 
 Merging Behavior
 ^^^^^^^^^^^^^^^^

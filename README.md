@@ -94,7 +94,7 @@ current = ["temperature_2m"]
 Run with both configurations:
 
 ```bash
-apiout run -c apis.toml -s serializers.toml --json
+apiout run --config apis.toml --serializers serializers.toml --json
 ```
 
 ### 3. Inline Serializers
@@ -246,7 +246,7 @@ apiout run --config mempool -p time_period=1w --json
 apiout run --config <config_name_or_path> [--json]
 
 # Multiple config files
-apiout run --config <config1> --config <config2> [-s <serializers.toml>] [--json]
+apiout run --config <config1> --config <config2> [--serializers <serializers.toml>] [--json]
 
 # Mix config names and paths
 apiout run --config mempool --config ./local.toml [--json]
@@ -600,7 +600,7 @@ mempool_blocks = "mempool_blocks"
 Run it:
 
 ```bash
-apiout run -c mempool_apis.toml -s mempool_serializers.toml --json
+apiout run --config mempool_apis.toml --serializers mempool_serializers.toml --json
 ```
 
 The output will include the `fee_analysis` result with all combined data from both APIs.

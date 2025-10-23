@@ -116,7 +116,7 @@ Run with both files:
 
 .. code-block:: bash
 
-   apiout run --config apis.toml -s serializers.toml --json
+   apiout run --config apis.toml --serializers serializers.toml --json
 
 4. With Reusable Client Configurations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -191,7 +191,7 @@ Fetch API data with configuration:
 
 .. code-block:: bash
 
-   apiout run --config <config.toml> [-s <serializers.toml>] [--json]
+   apiout run --config <config.toml> [--serializers <serializers.toml>] [--json]
    <json-source> | apiout run [--json]  # Read JSON config from stdin
 
 **Options:**
@@ -199,7 +199,9 @@ Fetch API data with configuration:
 * ``-c, --config``: Config file to load (can be specified multiple times). Accepts:
   - Config name (e.g., ``mempool``) → loads from ``~/.config/apiout/mempool.toml``
   - File path (e.g., ``./local.toml`` or ``/abs/path/config.toml``)
-* ``-s, --serializers``: Path to serializers configuration file (optional)
+* ``-s, --serializers``: Serializer file to load (can be specified multiple times). Accepts:
+  - Serializer name (e.g., ``my_serializers``) → loads from ``~/.config/apiout/my_serializers.toml``
+  - File path (e.g., ``./serializers.toml`` or ``/abs/path/serializers.toml``)
 * ``--json``: Output as JSON format (default: pretty-printed)
 
 When piping JSON to stdin (without ``-c``), apiout automatically detects and parses it.

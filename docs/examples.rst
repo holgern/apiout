@@ -72,7 +72,7 @@ Fetch weather data from the OpenMeteo API with full serialization.
 
 .. code-block:: bash
 
-   apiout run --config examples/apis.toml -s examples/serializers.toml --json
+   apiout run --config examples/apis.toml --serializers examples/serializers.toml --json
 
 **Expected Output**
 
@@ -548,7 +548,7 @@ For large projects, split configurations into multiple files:
 
 .. code-block:: bash
 
-   apiout run --config base.toml --config weather_apis.toml --config more_apis.toml -s custom_serializers.toml --json
+   apiout run --config base.toml --config weather_apis.toml --config more_apis.toml --serializers custom_serializers.toml --json
 
 **How It Works**
 
@@ -770,7 +770,7 @@ Post-processors allow you to combine and transform data from multiple API calls 
 .. code-block:: bash
 
    pip install pymempool
-   apiout run --config mempool_apis.toml -s mempool_serializers.toml --json
+   apiout run --config mempool_apis.toml --serializers mempool_serializers.toml --json
 
 **How It Works**
 

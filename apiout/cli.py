@@ -421,6 +421,47 @@ def _load_config_files(config_paths: list[Path]) -> dict[str, Any]:
     return config_data
 
 
+def _resolve_serializer_path(serializer_value: str) -> Path:
+    """
+    Resolve a serializer value to a Path.
+
+    - If contains .toml extension or path separators, treat as file path
+    - Otherwise, treat as name and look in config directory
+
+    Args:
+        serializer_value: Either a file path or a serializer name
+
+    Returns:
+        Resolved Path to serializer file
+
+    Raises:
+        typer.Exit if file doesn't exist
+    """
+    path = Path(serializer_value)
+
+    # Check if it's a file path (contains separators or .toml extension)
+    if (
+        "/" in serializer_value
+        or "\\" in serializer_value
+        or serializer_value.endswith(".toml")
+    ):
+        serializer_path = path.expanduser().resolve()
+    else:
+        # Treat as serializer name, look in config directory
+        config_dir = _get_config_dir()
+        serializer_path = config_dir / f"{serializer_value}.toml"
+
+    if not serializer_path.exists():
+        err_console.print(
+            f"[red]Error: Serializer file not found: {serializer_path}[/red]\n"
+            f"[yellow]Hint: Use --serializers with a file path or serializer "
+            f"name[/yellow]"
+        )
+        raise typer.Exit(1)
+
+    return serializer_path
+
+
 def _load_serializer_files(serializer_paths: list[Path]) -> dict[str, Any]:
     serializers: dict[str, Any] = {}
 
@@ -484,11 +525,11 @@ def _process_api(api, all_serializers, err_console, client_configs):
 
 @app.command("gen-config")
 def generate_from_config_cmd(
-    config: list[Path] = typer.Option(
+    config: list[str] = typer.Option(
         ...,
         "-c",
         "--config",
-        help="Path to TOML configuration file (can be specified multiple times)",
+        help="Config file(s) to load (can be specified multiple times)",
     ),
     output: Path = typer.Option(
         None,
@@ -497,7 +538,10 @@ def generate_from_config_cmd(
         help="Output file path (prints to stdout if not specified)",
     ),
 ) -> None:
-    config_data = _load_config_files(config)
+    config_paths = []
+    for config_value in config:
+        config_paths.append(_resolve_config_path(config_value))
+    config_data = _load_config_files(config_paths)
 
     if "apis" not in config_data or not config_data["apis"]:
         err_console.print("[red]Error: No 'apis' section found in config file[/red]")
@@ -638,12 +682,11 @@ def main(
         "--config",
         help="Config file(s) to load (can be specified multiple times)",
     ),
-    serializers: list[Path] = typer.Option(
+    serializers: list[str] = typer.Option(
         None,
         "-s",
         "--serializers",
-        help="Path to serializers TOML configuration file "
-        "(can be specified multiple times)",
+        help="Serializer file(s) to load (can be specified multiple times)",
     ),
     params: list[str] = typer.Option(
         None,
@@ -686,7 +729,10 @@ def main(
     global_serializers = config_data.get("serializers", {})
 
     if serializers:
-        global_serializers.update(_load_serializer_files(serializers))
+        serializer_paths = []
+        for serializer_value in serializers:
+            serializer_paths.append(_resolve_serializer_path(serializer_value))
+        global_serializers.update(_load_serializer_files(serializer_paths))
 
     user_params = _parse_params(params) if params else {}
 

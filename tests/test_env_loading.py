@@ -8,7 +8,12 @@ from unittest.mock import patch
 import pytest
 import typer
 
-from apiout.cli import _get_config_dir, _load_config_files, _resolve_config_path
+from apiout.cli import (
+    _get_config_dir,
+    _load_config_files,
+    _resolve_config_path,
+    _resolve_serializer_path,
+)
 
 
 class TestGetConfigDir:
@@ -239,3 +244,65 @@ serializer = "global_ser"
         """Test loading non-existent config file raises typer.Exit."""
         with pytest.raises(typer.Exit):
             _load_config_files([Path("/nonexistent/config.toml")])
+
+
+class TestResolveSerializerPath:
+    """Tests for _resolve_serializer_path function."""
+
+    def test_resolve_serializer_name(self):
+        """Test resolving a serializer name to config directory path."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_dir = Path(tmpdir)
+            serializer_file = config_dir / "test_serializer.toml"
+            serializer_file.write_text("""
+[serializers.test_serializer]
+test_field = "test_value"
+""")
+
+            with patch("apiout.cli._get_config_dir", return_value=config_dir):
+                result = _resolve_serializer_path("test_serializer")
+                assert result == serializer_file
+                assert result.exists()
+
+    def test_resolve_serializer_path_with_extension(self):
+        """Test resolving a serializer path with .toml extension."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+            serializer_file = tmpdir / "test.toml"
+            serializer_file.write_text("""
+[serializers.test_serializer]
+test_field = "test_value"
+""")
+
+            result = _resolve_serializer_path(str(serializer_file))
+            assert result == serializer_file.resolve()
+            assert result.exists()
+
+    def test_resolve_serializer_path_with_separators(self):
+        """Test resolving a serializer path with separators."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+            serializer_file = tmpdir / "subdir" / "test.toml"
+            serializer_file.parent.mkdir()
+            serializer_file.write_text("""
+[serializers.test_serializer]
+test_field = "test_value"
+""")
+
+            result = _resolve_serializer_path(str(serializer_file))
+            assert result == serializer_file.resolve()
+            assert result.exists()
+
+    def test_resolve_missing_serializer_name(self):
+        """Test resolving a non-existent serializer name raises typer.Exit."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_dir = Path(tmpdir)
+
+            with patch("apiout.cli._get_config_dir", return_value=config_dir):
+                with pytest.raises(typer.Exit):
+                    _resolve_serializer_path("nonexistent")
+
+    def test_resolve_missing_serializer_path(self):
+        """Test resolving a non-existent serializer path raises typer.Exit."""
+        with pytest.raises(typer.Exit):
+            _resolve_serializer_path("/nonexistent/serializer.toml")
