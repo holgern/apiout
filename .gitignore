@@ -139,3 +139,4 @@ dmypy.json
 apiout/_version.py
 
 .serena/
+CLAUDE.md
