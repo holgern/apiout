@@ -101,114 +101,125 @@ def traverse_path(obj: Any, path_parts: list[str], parse_json: bool = False) -> 
     return current
 
 
+def _resolve_string_field(obj: Any, field_config: str) -> Any:
+    if "." in field_config:
+        return traverse_path(obj, field_config.split("."))
+    return call_method_or_attr(obj, field_config)
+
+
+def _process_iterate_config(
+    nested_obj: Any, iterate_config: dict[str, Any]
+) -> list[Any]:
+    items: list[Any] = []
+    count_method = iterate_config.get("count")
+    item_method = iterate_config.get("item")
+    item_fields = iterate_config.get("fields", {})
+    limit = iterate_config.get("limit")
+
+    if not (count_method and item_method):
+        return items
+
+    count = call_method_or_attr(nested_obj, count_method)
+    if not isinstance(count, int) or count < 0:
+        return items
+
+    max_items = min(count, limit) if isinstance(limit, int) and limit > 0 else count
+
+    getter = getattr(nested_obj, item_method, None)
+    if getter is None or not callable(getter):
+        return items
+
+    for i in range(max_items):
+        item_obj = getter(i)
+        items.append(apply_field_mapping(item_obj, item_fields))
+
+    return items
+
+
+def _resolve_path_config(obj: Any, config: dict[str, Any]) -> Any:
+    path_parts = config["path"].split(".")
+    parse_json = config.get("parse_json", False)
+    current = traverse_path(obj, path_parts, parse_json)
+
+    limit = config.get("limit")
+    if isinstance(current, list) and isinstance(limit, int) and limit > 0:
+        current = current[:limit]
+
+    item_fields = config.get("item_fields")
+    if item_fields and isinstance(current, list):
+        current = [apply_field_mapping(item, item_fields) for item in current]
+
+    item_serializer = config.get("item_serializer")
+    if item_serializer and isinstance(current, list):
+        current = [apply_config_serializer(item, item_serializer) for item in current]
+
+    return current
+
+
+def _resolve_method_config(obj: Any, config: dict[str, Any]) -> Any:
+    nested_obj = call_method_or_attr(obj, config["method"])
+    if nested_obj is None:
+        return None
+
+    if "fields" in config:
+        return apply_field_mapping(nested_obj, config["fields"])
+
+    if "item_fields" in config and isinstance(nested_obj, list):
+        item_fields = config["item_fields"]
+        return [apply_field_mapping(item, item_fields) for item in nested_obj]
+
+    if "item_serializer" in config and isinstance(nested_obj, list):
+        item_serializer = config["item_serializer"]
+        return [apply_config_serializer(item, item_serializer) for item in nested_obj]
+
+    if "iterate" in config:
+        iterate_config = config["iterate"]
+        if isinstance(iterate_config, dict):
+            return _process_iterate_config(nested_obj, iterate_config)
+
+    return nested_obj
+
+
+def _resolve_dict_config(obj: Any, config: dict[str, Any]) -> Any:
+    if "path" in config:
+        return _resolve_path_config(obj, config)
+
+    if "method" in config:
+        return _resolve_method_config(obj, config)
+
+    if "fields" in config:
+        return apply_field_mapping(obj, config["fields"])
+
+    return config
+
+
+def _resolve_mapping_value(obj: Any, value: Any) -> Any:
+    if isinstance(value, str):
+        return _resolve_string_field(obj, value)
+
+    if isinstance(value, dict):
+        return _resolve_dict_config(obj, value)
+
+    return value
+
+
 def apply_field_mapping(obj: Any, field_config: Any) -> Any:
     if isinstance(field_config, str):
-        # Handle simple dot notation paths
-        if "." in field_config:
-            path_parts = field_config.split(".")
-            return traverse_path(obj, path_parts)
-        else:
-            return call_method_or_attr(obj, field_config)
+        return _resolve_string_field(obj, field_config)
+
     if isinstance(field_config, dict):
-        result = {}
-        # First pass: process all fields to build a complete context
-        context = {}
-        for key, value in field_config.items():
-            if isinstance(value, str):
-                if "." in value:
-                    context[key] = traverse_path(obj, value.split("."))
-                else:
-                    context[key] = call_method_or_attr(obj, value)
-            elif isinstance(value, dict):
-                if "path" in value:
-                    # Handle direct path extraction with JSON parsing support
-                    path = value["path"]
-                    path_parts = path.split(".")
-                    parse_json = value.get("parse_json", False)
-                    current = traverse_path(obj, path_parts, parse_json)
+        context = {
+            key: _resolve_mapping_value(obj, value)
+            for key, value in field_config.items()
+        }
 
-                    # Handle limit for arrays
-                    if isinstance(current, list) and "limit" in value:
-                        limit = value["limit"]
-                        if isinstance(limit, int) and limit > 0:
-                            current = current[:limit]
+        return {
+            key: context[key]
+            for key, value in field_config.items()
+            if not (isinstance(value, dict) and value.get("hidden", False))
+        }
 
-                    item_fields = value.get("item_fields")
-                    if item_fields and isinstance(current, list):
-                        current = [
-                            apply_field_mapping(item, item_fields)
-                            for item in current
-                        ]
-
-                    item_serializer = value.get("item_serializer")
-                    if item_serializer and isinstance(current, list):
-                        current = [
-                            apply_config_serializer(item, item_serializer)
-                            for item in current
-                        ]
-
-                    context[key] = current
-                elif "method" in value:
-                    nested_obj = call_method_or_attr(obj, value["method"])
-                    if nested_obj is not None:
-                        if "fields" in value:
-                            context[key] = apply_field_mapping(
-                                nested_obj, value["fields"]
-                            )
-                        elif (
-                            "item_fields" in value
-                            and isinstance(nested_obj, list)
-                        ):
-                            item_fields = value["item_fields"]
-                            context[key] = [
-                                apply_field_mapping(item, item_fields)
-                                for item in nested_obj
-                            ]
-                        elif (
-                            "item_serializer" in value
-                            and isinstance(nested_obj, list)
-                        ):
-                            item_serializer = value["item_serializer"]
-                            context[key] = [
-                                apply_config_serializer(item, item_serializer)
-                                for item in nested_obj
-                            ]
-                        elif "iterate" in value:
-                            items = []
-                            count_method = value["iterate"].get("count")
-                            item_method = value["iterate"].get("item")
-                            item_fields = value["iterate"].get("fields", {})
-                            limit = value["iterate"].get("limit", None)
-
-                            if count_method and item_method:
-                                count = call_method_or_attr(nested_obj, count_method)
-                                max_items = (
-                                    min(count, limit)
-                                    if isinstance(limit, int) and limit > 0
-                                    else count
-                                )
-                                for i in range(max_items):
-                                    item_obj = getattr(nested_obj, item_method)(i)
-                                    item_data = apply_field_mapping(
-                                        item_obj, item_fields
-                                    )
-                                    items.append(item_data)
-                                context[key] = items
-                elif "fields" in value:
-                    context[key] = apply_field_mapping(obj, value["fields"])
-            else:
-                # Handle non-string, non-dict values (like True, 200, etc.)
-                context[key] = value
-
-        # Second pass: build final result, excluding hidden fields
-        for key, value in field_config.items():
-            if isinstance(value, dict) and value.get("hidden", False):
-                continue  # Skip hidden fields
-            result[key] = context[key]
-
-        return result
-    else:
-        return serialize_value(obj)
+    return serialize_value(obj)
 
 
 def apply_config_serializer(responses: Any, serializer_config: dict[str, Any]) -> Any:
