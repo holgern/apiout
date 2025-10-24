@@ -482,3 +482,33 @@ def test_apply_field_mapping_parse_json_invalid_json():
     # Check plain text remains as string
     assert isinstance(result["plain"], str)
     assert result["plain"] == "just text"
+
+
+def test_apply_field_mapping_list_item_fields():
+    data = {
+        "items": [
+            MockObject(name="Alice", age=30),
+            MockObject(name="Bob", age=25),
+        ]
+    }
+
+    config = {
+        "people": {
+            "path": "items",
+            "item_fields": {"n": "name", "a": "age"},
+        }
+    }
+
+    result = apply_field_mapping(data, config)
+
+    assert result["people"] == [{"n": "Alice", "a": 30}, {"n": "Bob", "a": 25}]
+
+
+def test_apply_field_mapping_list_item_fields_string():
+    data = {"values": [MockObject(value=10), MockObject(value=20)]}
+
+    config = {"numbers": {"path": "values", "item_fields": "value"}}
+
+    result = apply_field_mapping(data, config)
+
+    assert result["numbers"] == [10, 20]

@@ -809,11 +809,88 @@ Post-processors allow you to combine and transform data from multiple API calls 
 * Aggregating data from different sources
 * Transforming API responses into domain objects
 
+JSON Parsing and Hidden Fields Example
+-------------------------------------
+
+Processing JSON Responses with Hidden Intermediate Fields
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When APIs return JSON strings that need to be parsed and processed, you can use ``parse_json`` and ``hidden`` parameters together:
+
+**Configuration** (``context7_docs.toml``):
+
+.. code-block:: toml
+
+   [[apis]]
+   name = "get_docs"
+   module = "requests"
+   client_class = "Session"
+   method = "get"
+   url = "https://context7.com/api/v1/${library}?type=json&topic=${topic}&tokens=${tokens}"
+   param_defaults = {library = "vercel/next.js", topic = "ssr", tokens = 5000}
+   serializer = "get_docs_serializer"
+
+   [apis.method_params]
+   library = "${library}"
+   topic = "${topic}"
+   tokens = "${tokens}"
+
+   [apis.headers]
+   Authorization = "Bearer ${CONTEXT7_API_KEY}"
+
+   [serializers.get_docs_serializer]
+   [serializers.get_docs_serializer.fields]
+   ok = "ok"
+   status_code = "status_code"
+   text = { path = "text", parse_json = true, hidden = true }
+   url = "url"
+   results = { path = "text.snippets", limit = 1}
+
+**Running the Example**:
+
+.. code-block:: bash
+
+   export CONTEXT7_API_KEY="your-api-key"
+   apiout run -c examples/context7_docs.toml -p library="/oduit/oduit" --json
+
+**How It Works**:
+
+1. The ``text`` field contains a JSON string response from the API
+2. ``parse_json = true`` parses the JSON string into a Python object
+3. ``hidden = true`` processes the field but excludes it from final output
+4. The ``results`` field can access the parsed ``text`` data to extract ``snippets``
+5. ``limit = 1`` restricts output to the first snippet
+
+**Expected Output**:
+
+.. code-block:: json
+
+   {
+     "ok": true,
+     "status_code": 200,
+     "url": "https://context7.com/api/v1/oduit/oduit?type=json&topic=ssr&tokens=5000",
+     "results": [
+       {
+         "codeTitle": "Example Code",
+         "codeDescription": "Description of the code example",
+         "codeLanguage": "python",
+         "relevance": 0.95
+       }
+     ]
+   }
+
+**Benefits**:
+
+* **Clean Output**: Intermediate JSON data is hidden from final result
+* **Efficient Processing**: JSON is parsed once and reused by multiple fields
+* **Flexible**: Can combine with other features like ``limit`` and dot notation
+* **Maintainable**: Clear separation between data processing and output formatting
+
 Variable Substitution Example
 -----------------------------
 
 Dynamic URL and Parameter Building
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Use ``${param_name}`` syntax for dynamic configuration with variable substitution:
 

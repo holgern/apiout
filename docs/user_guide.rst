@@ -135,10 +135,50 @@ Iterate over collections with indexed access:
    method = "GetContainer"
    [serializers.example.fields.data.fields.variables]
    iterate = {
-     count = "Length",
-     item = "GetItem",
-     fields = { name = "Name", value = "Value" }
+      count = "Length",
+      item = "GetItem",
+      fields = { name = "Name", value = "Value" }
    }
+
+**JSON Parsing**
+
+The ``parse_json`` parameter provides explicit control over JSON parsing for fields containing JSON strings:
+
+.. code-block:: toml
+
+   [serializers.api_serializer]
+   [serializers.api_serializer.fields]
+   raw_text = "text"
+   parsed_data = { path = "text", parse_json = true }
+   first_item = { path = "text.items", parse_json = true, limit = 1 }
+
+* ``raw_text`` returns the original JSON string
+* ``parsed_data`` returns the parsed JSON object
+* ``first_item`` parses JSON and extracts the first item from an array
+
+The ``parse_json`` parameter is applied to the first segment of the path, allowing subsequent path navigation through the parsed JSON structure.
+
+**Hidden Fields**
+
+The ``hidden`` parameter allows fields to be processed but excluded from the final output. This is useful for intermediate data that should be available to other field mappings but not included in the result:
+
+.. code-block:: toml
+
+   [serializers.context7_serializer]
+   [serializers.context7_serializer.fields]
+   ok = "ok"
+   status_code = "status_code"
+   text = { path = "text", parse_json = true, hidden = true }
+   url = "url"
+   results = { path = "text.snippets", limit = 1 }
+
+In this example:
+
+* ``text`` is parsed as JSON but hidden from output
+* ``results`` can access the parsed ``text`` data to extract snippets
+* The final output contains ``ok``, ``status_code``, ``url``, and ``results``
+
+Hidden fields are processed in the first pass to build a complete context, then excluded from the final result in the second pass.
 
 Serializer Referencing
 ~~~~~~~~~~~~~~~~~~~~~~

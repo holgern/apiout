@@ -3,15 +3,29 @@ from collections.abc import Mapping
 from typing import Any
 
 
+def serialize_key(key: Any) -> str:
+    if isinstance(key, str):
+        return key
+
+    isoformat = getattr(key, "isoformat", None)
+    if callable(isoformat):
+        try:
+            return isoformat()
+        except Exception:
+            pass
+
+    return str(key)
+
+
 def serialize_value(obj: Any) -> Any:
     if isinstance(obj, (str, int, float, bool, type(None))):
         return obj
     elif isinstance(obj, (list, tuple)):
         return [serialize_value(item) for item in obj]
     elif isinstance(obj, dict):
-        return {k: serialize_value(v) for k, v in obj.items()}
+        return {serialize_key(k): serialize_value(v) for k, v in obj.items()}
     elif isinstance(obj, Mapping):
-        return {k: serialize_value(v) for k, v in obj.items()}
+        return {serialize_key(k): serialize_value(v) for k, v in obj.items()}
     elif hasattr(obj, "__dict__") and obj.__dict__:
         result = {}
         for key, value in obj.__dict__.items():
@@ -119,6 +133,20 @@ def apply_field_mapping(obj: Any, field_config: Any) -> Any:
                         if isinstance(limit, int) and limit > 0:
                             current = current[:limit]
 
+                    item_fields = value.get("item_fields")
+                    if item_fields and isinstance(current, list):
+                        current = [
+                            apply_field_mapping(item, item_fields)
+                            for item in current
+                        ]
+
+                    item_serializer = value.get("item_serializer")
+                    if item_serializer and isinstance(current, list):
+                        current = [
+                            apply_config_serializer(item, item_serializer)
+                            for item in current
+                        ]
+
                     context[key] = current
                 elif "method" in value:
                     nested_obj = call_method_or_attr(obj, value["method"])
@@ -127,6 +155,24 @@ def apply_field_mapping(obj: Any, field_config: Any) -> Any:
                             context[key] = apply_field_mapping(
                                 nested_obj, value["fields"]
                             )
+                        elif (
+                            "item_fields" in value
+                            and isinstance(nested_obj, list)
+                        ):
+                            item_fields = value["item_fields"]
+                            context[key] = [
+                                apply_field_mapping(item, item_fields)
+                                for item in nested_obj
+                            ]
+                        elif (
+                            "item_serializer" in value
+                            and isinstance(nested_obj, list)
+                        ):
+                            item_serializer = value["item_serializer"]
+                            context[key] = [
+                                apply_config_serializer(item, item_serializer)
+                                for item in nested_obj
+                            ]
                         elif "iterate" in value:
                             items = []
                             count_method = value["iterate"].get("count")
