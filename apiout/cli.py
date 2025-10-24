@@ -2,7 +2,7 @@ import json
 import os
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, Union
 
 import typer
 from rich.console import Console
@@ -800,7 +800,7 @@ def _auto_generate_serializers(
 
 def _process_stdin_params(
     has_stdin: bool,
-    config: list[str] | None,
+    config: Union[list[str], None],
     user_params: dict[str, str],
     err_console: Console,
 ) -> None:
