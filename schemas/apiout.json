@@ -141,6 +141,13 @@
           "type": "boolean",
           "description": "When true, flattens this API's output by removing the name wrapper in JSON output",
           "default": false
+        },
+        "parse_json_fields": {
+          "type": "array",
+          "description": "List of field names that should be automatically parsed as JSON",
+          "items": {
+            "type": "string"
+          }
         }
       },
       "additionalProperties": true
@@ -172,6 +179,25 @@
             "method": {
               "type": "string",
               "description": "Method name to call on the object"
+            },
+            "path": {
+              "type": "string",
+              "description": "Dot-separated path to access nested data (e.g., 'user.profile.name')"
+            },
+            "parse_json": {
+              "type": "boolean",
+              "description": "Parse the field value as JSON before further processing",
+              "default": false
+            },
+            "limit": {
+              "type": "integer",
+              "description": "Maximum number of items to include when the result is an array",
+              "minimum": 1
+            },
+            "hidden": {
+              "type": "boolean",
+              "description": "When true, this field is processed but excluded from the final output",
+              "default": false
             },
             "fields": {
               "type": "object",

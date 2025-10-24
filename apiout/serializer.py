@@ -41,7 +41,7 @@ def call_method_or_attr(obj: Any, name: str) -> Any:
     return attr
 
 
-def traverse_path(obj: Any, path_parts: list[str]) -> Any:
+def traverse_path(obj: Any, path_parts: list[str], parse_json: bool = False) -> Any:
     current = obj
     idx = 0
 
@@ -51,7 +51,8 @@ def traverse_path(obj: Any, path_parts: list[str]) -> Any:
 
         part = path_parts[idx]
 
-        if isinstance(current, str):
+        # Auto-parse JSON strings when traversing (only if not explicitly requested)
+        if isinstance(current, str) and not parse_json:
             try:
                 current = json.loads(current)
                 continue
@@ -74,6 +75,13 @@ def traverse_path(obj: Any, path_parts: list[str]) -> Any:
             except AttributeError:
                 return None
 
+        # Parse JSON if requested after accessing the first part
+        if parse_json and idx == 0 and isinstance(current, str):
+            try:
+                current = json.loads(current)
+            except (json.JSONDecodeError, TypeError, ValueError):
+                pass  # Keep original string if parsing fails
+
         idx += 1
 
     return current
@@ -89,18 +97,21 @@ def apply_field_mapping(obj: Any, field_config: Any) -> Any:
             return call_method_or_attr(obj, field_config)
     if isinstance(field_config, dict):
         result = {}
+        # First pass: process all fields to build a complete context
+        context = {}
         for key, value in field_config.items():
             if isinstance(value, str):
                 if "." in value:
-                    result[key] = traverse_path(obj, value.split("."))
+                    context[key] = traverse_path(obj, value.split("."))
                 else:
-                    result[key] = call_method_or_attr(obj, value)
+                    context[key] = call_method_or_attr(obj, value)
             elif isinstance(value, dict):
                 if "path" in value:
                     # Handle direct path extraction with JSON parsing support
                     path = value["path"]
                     path_parts = path.split(".")
-                    current = traverse_path(obj, path_parts)
+                    parse_json = value.get("parse_json", False)
+                    current = traverse_path(obj, path_parts, parse_json)
 
                     # Handle limit for arrays
                     if isinstance(current, list) and "limit" in value:
@@ -108,12 +119,12 @@ def apply_field_mapping(obj: Any, field_config: Any) -> Any:
                         if isinstance(limit, int) and limit > 0:
                             current = current[:limit]
 
-                    result[key] = current
+                    context[key] = current
                 elif "method" in value:
                     nested_obj = call_method_or_attr(obj, value["method"])
                     if nested_obj is not None:
                         if "fields" in value:
-                            result[key] = apply_field_mapping(
+                            context[key] = apply_field_mapping(
                                 nested_obj, value["fields"]
                             )
                         elif "iterate" in value:
@@ -136,9 +147,19 @@ def apply_field_mapping(obj: Any, field_config: Any) -> Any:
                                         item_obj, item_fields
                                     )
                                     items.append(item_data)
-                                result[key] = items
+                                context[key] = items
                 elif "fields" in value:
-                    result[key] = apply_field_mapping(obj, value["fields"])
+                    context[key] = apply_field_mapping(obj, value["fields"])
+            else:
+                # Handle non-string, non-dict values (like True, 200, etc.)
+                context[key] = value
+
+        # Second pass: build final result, excluding hidden fields
+        for key, value in field_config.items():
+            if isinstance(value, dict) and value.get("hidden", False):
+                continue  # Skip hidden fields
+            result[key] = context[key]
+
         return result
     else:
         return serialize_value(obj)

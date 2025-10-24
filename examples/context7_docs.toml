@@ -11,7 +11,7 @@ module = "requests"
 client_class = "Session"
 method = "get"
 flatten = true
-url = "https://context7.com/api/v1/${library}?type=text&topic=${topic}&tokens=${tokens}"
+url = "https://context7.com/api/v1/${library}?type=json&topic=${topic}&tokens=${tokens}"
 param_defaults = {library = "vercel/next.js", topic = "ssr", tokens = 5000}
 serializer = "get_docs_serializer"
 
@@ -28,6 +28,6 @@ Authorization = "Bearer ${CONTEXT7_API_KEY}"
 [serializers.get_docs_serializer.fields]
 ok = "ok"
 status_code = "status_code"
-text = "text"
+text = { path = "text", parse_json = true, hidden = true }
 url = "url"
-results = { path = "text.results", limit = 1}
+results = { path = "text.snippets", limit = 3}

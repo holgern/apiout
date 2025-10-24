@@ -286,3 +286,199 @@ def test_apply_field_mapping_path_through_attribute_with_json_string():
 
     assert result["first_id"] == "/first/id"
     assert result["first_result"] == [{"id": "/first/id", "title": "First"}]
+
+
+def test_apply_field_mapping_hidden_field():
+    """Test that hidden fields are processed but excluded from output."""
+
+    class ResponseLike:
+        def __init__(self, payload: str):
+            self._payload = payload
+
+        @property
+        def text(self):
+            return self._payload
+
+    payload = json.dumps(
+        {
+            "snippets": [
+                {"codeTitle": "Example 1", "relevance": 0.9},
+                {"codeTitle": "Example 2", "relevance": 0.8},
+            ]
+        }
+    )
+    obj = ResponseLike(payload)
+    config = {
+        "ok": True,
+        "status_code": 200,
+        "text": {"path": "text", "parse_json": True, "hidden": True},
+        "results": {"path": "text.snippets", "limit": 1},
+    }
+
+    result = apply_field_mapping(obj, config)
+
+    # Check that hidden field is not in output
+    assert "text" not in result
+
+    # Check that other fields are present
+    assert result["ok"] is True
+    assert result["status_code"] == 200
+    assert "results" in result
+
+    # Check that results can access the parsed text data
+    assert result["results"] == [{"codeTitle": "Example 1", "relevance": 0.9}]
+
+
+def test_apply_field_mapping_hidden_field_without_parse_json():
+    """Test hidden field without JSON parsing."""
+    obj = {
+        "ok": True,
+        "status_code": 200,
+        "text": "raw text",
+        "url": "https://example.com",
+    }
+    config = {
+        "ok": "ok",
+        "status_code": "status_code",
+        "text": {"path": "text", "hidden": True},
+        "url": "url",
+    }
+
+    result = apply_field_mapping(obj, config)
+
+    # Check that hidden field is not in output
+    assert "text" not in result
+
+    # Check that other fields are present
+    assert result["ok"] is True
+    assert result["status_code"] == 200
+    assert result["url"] == "https://example.com"
+
+
+def test_apply_field_mapping_multiple_hidden_fields():
+    """Test multiple hidden fields."""
+    obj = {
+        "ok": True,
+        "status_code": 200,
+        "text": '{"data": "value"}',
+        "metadata": '{"internal": "data"}',
+        "url": "https://example.com",
+    }
+    config = {
+        "ok": "ok",
+        "status_code": "status_code",
+        "text": {"path": "text", "parse_json": True, "hidden": True},
+        "metadata": {"path": "metadata", "parse_json": True, "hidden": True},
+        "url": "url",
+    }
+
+    result = apply_field_mapping(obj, config)
+
+    # Check that hidden fields are not in output
+    assert "text" not in result
+    assert "metadata" not in result
+
+    # Check that visible fields are present
+    assert result["ok"] is True
+    assert result["status_code"] == 200
+    assert result["url"] == "https://example.com"
+
+
+def test_apply_field_mapping_hidden_field_with_method():
+    """Test hidden field with method call."""
+
+    class Parent:
+        def __init__(self):
+            self.ok = True
+
+        def get_child(self):
+            return MockObject(name="child", value=42)
+
+    obj = Parent()
+    config = {
+        "child": {
+            "method": "get_child",
+            "fields": {"name": "name", "value": "value"},
+            "hidden": True,
+        },
+        "visible": "ok",
+    }
+
+    result = apply_field_mapping(obj, config)
+
+    # Check that hidden field is not in output
+    assert "child" not in result
+
+    # Check that visible field is present
+    assert result["visible"] is True
+
+
+def test_apply_field_mapping_parse_json():
+    """Test parse_json functionality."""
+
+    class ResponseLike:
+        def __init__(self, payload: str):
+            self._payload = payload
+
+        @property
+        def text(self):
+            return self._payload
+
+    payload = json.dumps(
+        {
+            "snippets": [
+                {"codeTitle": "Example 1", "relevance": 0.9},
+                {"codeTitle": "Example 2", "relevance": 0.8},
+            ]
+        }
+    )
+    obj = ResponseLike(payload)
+    config = {
+        "raw_text": "text",
+        "parsed_text": {"path": "text", "parse_json": True},
+        "first_snippet": {"path": "text.snippets", "parse_json": True, "limit": 1},
+    }
+
+    result = apply_field_mapping(obj, config)
+
+    # Check raw text is still a string
+    assert result["raw_text"] == payload
+    assert isinstance(result["raw_text"], str)
+
+    # Check parsed text is a dict
+    assert isinstance(result["parsed_text"], dict)
+    assert "snippets" in result["parsed_text"]
+    assert len(result["parsed_text"]["snippets"]) == 2
+
+    # Check first snippet extraction with parse_json
+    assert isinstance(result["first_snippet"], list)
+    assert len(result["first_snippet"]) == 1
+    assert result["first_snippet"][0]["codeTitle"] == "Example 1"
+
+
+def test_apply_field_mapping_parse_json_invalid_json():
+    """Test parse_json with invalid JSON string."""
+    obj = {
+        "valid_json": '{"key": "value"}',
+        "invalid_json": '{"key": invalid}',
+        "plain_text": "just text",
+    }
+    config = {
+        "valid": {"path": "valid_json", "parse_json": True},
+        "invalid": {"path": "invalid_json", "parse_json": True},
+        "plain": {"path": "plain_text", "parse_json": True},
+    }
+
+    result = apply_field_mapping(obj, config)
+
+    # Check valid JSON is parsed
+    assert isinstance(result["valid"], dict)
+    assert result["valid"]["key"] == "value"
+
+    # Check invalid JSON remains as string (parsing failed gracefully)
+    assert isinstance(result["invalid"], str)
+    assert result["invalid"] == '{"key": invalid}'
+
+    # Check plain text remains as string
+    assert isinstance(result["plain"], str)
+    assert result["plain"] == "just text"
