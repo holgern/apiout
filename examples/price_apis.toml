@@ -1,0 +1,44 @@
+[serializers.price_ohlc]
+[serializers.price_ohlc.fields]
+time = { path = "index.tolist" }
+open = { path = "Open.tolist" }
+high = { path = "High.tolist" }
+low = { path = "Low.tolist" }
+close = { path = "Close.tolist" }
+
+[clients.price]
+module = "btcpriceticker.price"
+client_class = "Price"
+init_params = { fiat = "eur", interval = "1h", days_ago = 1, service = "coinpaprika", enable_ohlc = true, enable_timeseries = true }
+
+[[apis]]
+name = "price_refresh"
+client = "price"
+method = "refresh"
+
+[[apis]]
+name = "price_data"
+client = "price"
+method = "price"
+
+[[apis]]
+name = "price_now"
+client = "price"
+method = "get_price_now"
+
+[[apis]]
+name = "price_change"
+client = "price"
+method = "get_price_change"
+
+[[apis]]
+name = "price_timeseries"
+client = "price"
+method = "get_timeseries_list"
+
+[[apis]]
+name = "price_ohlc"
+client = "price"
+method = "ohlc"
+serializer = "price_ohlc"
+
